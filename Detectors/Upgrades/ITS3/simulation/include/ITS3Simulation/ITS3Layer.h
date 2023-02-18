@@ -73,9 +73,9 @@ class ITS3Layer : public TObject
   double mMiddleChipWidth{0.};     //! middle chip width
   int mNumSubSensorsHalfLayer{0};  //! num of subsensors in half layer
   double mHeightStripFoam{0.};     //! strip foam height
-  double mLengthSemiCircleFoam{0.};//! semi-circle foam length
-  double mThickGluedFoam{0.};      //! glued foam thickness
-  double mGapXDirection{0.};       //! gap between quarter layer(only for layer 4)
+  double mLengthSemiCircleFoam{0.}; //! semi-circle foam length
+  double mThickGluedFoam{0.};       //! glued foam thickness
+  double mGapXDirection{0.};        //! gap between quarter layer(only for layer 4)
 
   ClassDefOverride(ITS3Layer, 0); // ITS3 geometry
 };                                // namespace its3
