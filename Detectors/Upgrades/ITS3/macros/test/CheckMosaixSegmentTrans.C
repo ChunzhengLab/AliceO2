@@ -9,8 +9,8 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
-/// \file CheckSuperAlpideSegmentTrans.C
-/// \brief Simple macro to check ITS3 Alpide Trans
+/// \file CheckMosaixSegmentTrans.C
+/// \brief Simple macro to check ITS3 segment transformation
 
 #if !defined(__CLING__) || defined(__ROOTCLING__)
 
@@ -26,7 +26,7 @@
 #include "TStyle.h"
 #include "TTree.h"
 
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 #include "ITS3Base/SpecsV2.h"
 
 #endif
@@ -37,10 +37,10 @@ constexpr float PI = 3.14159274101257324e+00f;
 constexpr float Rad2Deg = 180.f / PI;
 constexpr float Deg2Rad = 1. / Rad2Deg;
 
-constexpr auto nRows{SegmentationSuperAlpide::mNRows};
-constexpr auto nCols{SegmentationSuperAlpide::mNCols};
-constexpr auto fLength{SegmentationSuperAlpide::mLength};
-constexpr auto fWidth{SegmentationSuperAlpide::mWidth};
+constexpr auto nRows{SegmentationMosaix::mNRows};
+constexpr auto nCols{SegmentationMosaix::mNCols};
+constexpr auto fLength{SegmentationMosaix::mLength};
+constexpr auto fWidth{SegmentationMosaix::mWidth};
 
 TH2* DrawReverseBins(TH2* h)
 {
@@ -83,7 +83,7 @@ void DrawXAxisCol(TH1* h)
   newaxis->Draw();
 }
 
-void CheckSuperAlpideSegmentTrans()
+void CheckMosaixSegmentTrans()
 {
   gStyle->SetOptStat(1111111);
 
@@ -140,10 +140,10 @@ void CheckSuperAlpideSegmentTrans()
       g_arc_inner->AddPoint(x_inner, y_inner);
       g_arc_outer->AddPoint(x_outer, y_outer);
       // Test Segmentation
-      SuperSegmentations[iLayer].curvedToFlat(x_inner, y_inner, x_inner_flat, y_inner_flat);
-      SuperSegmentations[iLayer].flatToCurved(x_inner_flat, y_inner_flat, x_inner_curved, y_inner_curved);
-      SuperSegmentations[iLayer].curvedToFlat(x_outer, y_outer, x_outer_flat, y_outer_flat);
-      SuperSegmentations[iLayer].flatToCurved(x_outer_flat, y_outer_flat, x_outer_curved, y_outer_curved);
+      Segmentations[iLayer].curvedToFlat(x_inner, y_inner, x_inner_flat, y_inner_flat);
+      Segmentations[iLayer].flatToCurved(x_inner_flat, y_inner_flat, x_inner_curved, y_inner_curved);
+      Segmentations[iLayer].curvedToFlat(x_outer, y_outer, x_outer_flat, y_outer_flat);
+      Segmentations[iLayer].flatToCurved(x_outer_flat, y_outer_flat, x_outer_curved, y_outer_curved);
       g_arc_inner_flat->AddPoint(x_inner_flat, y_inner_flat);
       g_arc_outer_flat->AddPoint(x_outer_flat, y_outer_flat);
       h_f2c_res->Fill(x_inner - x_inner_curved, y_inner - y_inner_curved);
@@ -202,8 +202,8 @@ void CheckSuperAlpideSegmentTrans()
         float xRow{0}, zCol{0};
         int iiRow{0}, iiCol{0};
         auto v1 =
-          SuperSegmentations[iLayer].detectorToLocal(iRow, iCol, xRow, zCol);
-        auto v2 = SuperSegmentations[iLayer].localToDetector(xRow, zCol, iiRow,
+          Segmentations[iLayer].detectorToLocal(iRow, iCol, xRow, zCol);
+        auto v2 = Segmentations[iLayer].localToDetector(xRow, zCol, iiRow,
                                                              iiCol);
         // Info("L2D",
         //      "iRow=%d, iCol=%d --d2l(%s)--> xRow=%f, zCol=%f --l2d(%s)--> "

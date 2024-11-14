@@ -23,10 +23,10 @@
 
 #include "ITSMFTSimulation/ChipDigitsContainer.h"
 #include "ITSMFTSimulation/AlpideSimResponse.h"
-#include "ITSMFTSimulation/DigiParams.h"
+#include "ITS3Simulation/DigiParams.h"
 #include "ITSMFTSimulation/Hit.h"
 #include "ITSBase/GeometryTGeo.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 #include "DataFormatsITSMFT/Digit.h"
 #include "DataFormatsITSMFT/ROFRecord.h"
 #include "CommonDataFormat/InteractionRecord.h"
@@ -44,8 +44,8 @@ class Digitizer : public TObject
   void setMCLabels(o2::dataformats::MCTruthContainer<o2::MCCompLabel>* mclb) { mMCLabels = mclb; }
   void setROFRecords(std::vector<o2::itsmft::ROFRecord>* rec) { mROFRecords = rec; }
 
-  o2::itsmft::DigiParams& getParams() { return (o2::itsmft::DigiParams&)mParams; }
-  const o2::itsmft::DigiParams& getParams() const { return mParams; }
+  DigiParams& getParams() { return (DigiParams&)mParams; }
+  const DigiParams& getParams() const { return mParams; }
 
   void init();
 
@@ -62,8 +62,8 @@ class Digitizer : public TObject
   bool isContinuous() const { return mParams.isContinuous(); }
   void fillOutputContainer(uint32_t maxFrame = 0xffffffff);
 
-  void setDigiParams(const o2::itsmft::DigiParams& par) { mParams = par; }
-  const o2::itsmft::DigiParams& getDigitParams() const { return mParams; }
+  void setDigiParams(const DigiParams& par) { mParams = par; }
+  const DigiParams& getDigitParams() const { return mParams; }
 
   // provide the common itsmft::GeometryTGeo to access matrices and segmentation
   void setGeometry(const o2::its::GeometryTGeo* gm) { mGeometry = gm; }
@@ -97,7 +97,7 @@ class Digitizer : public TObject
 
   static constexpr float sec2ns = 1e9;
 
-  o2::itsmft::DigiParams mParams;          ///< digitization parameters
+  DigiParams mParams;          ///< digitization parameters
   o2::InteractionTimeRecord mEventTime;    ///< global event time and interaction record
   o2::InteractionRecord mIRFirstSampledTF; ///< IR of the 1st sampled IR, noise-only ROFs will be inserted till this IR only
   double mCollisionTimeWrtROF{};
@@ -108,7 +108,8 @@ class Digitizer : public TObject
   uint32_t mEventROFrameMin = 0xffffffff; ///< lowest RO frame for processed events (w/o automatic noise ROFs)
   uint32_t mEventROFrameMax = 0;          ///< highest RO frame forfor processed events (w/o automatic noise ROFs)
 
-  o2::itsmft::AlpideSimResponse* mAlpSimResp = nullptr; // simulated response
+  o2::itsmft::AlpideSimResponse* mIBSimResp = nullptr; // simulated response
+  o2::itsmft::AlpideSimResponse* mOBSimResp = nullptr; // simulated response
 
   const o2::its::GeometryTGeo* mGeometry = nullptr; ///< ITS3 geometry
 

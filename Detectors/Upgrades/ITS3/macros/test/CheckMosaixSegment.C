@@ -49,20 +49,20 @@
 #include "MathUtils/Cartesian.h"
 
 #include "ITS3Base/SpecsV2.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 #include "ITSBase/GeometryTGeo.h"
 
 #endif
 
 using gITS = o2::its::GeometryTGeo;
 
-void CheckSuperAlpideSegment(bool isTestDetectorToLocal = false,
+void CheckMosaixSegment(bool isTestDetectorToLocal = false,
                              bool isTestFlatToCurved = false,
                              bool isTestLocalToGlobal = false)
 {
   using namespace o2::its3;
-  static constexpr unsigned int mNCols{SegmentationSuperAlpide::mNCols};
-  static constexpr unsigned int mNRows{SegmentationSuperAlpide::mNRows};
+  static constexpr unsigned int mNCols{SegmentationMosaix::mNCols};
+  static constexpr unsigned int mNRows{SegmentationMosaix::mNRows};
   static constexpr unsigned int nPixels{mNCols * mNRows};
 
   if (isTestDetectorToLocal || isTestFlatToCurved) {
@@ -82,7 +82,7 @@ void CheckSuperAlpideSegment(bool isTestDetectorToLocal = false,
     TGraph* g_col_zLocal_translate = new TGraph();
     g_col_zLocal_translate->SetMarkerStyle(20);
 
-    SegmentationSuperAlpide seg(0);
+    SegmentationMosaix seg(0);
     int nPoint = 0;
     for (UInt_t i = 0; i < mNRows; ++i) {
       for (UInt_t j = 0; j < mNCols; ++j) {
@@ -170,11 +170,11 @@ void CheckSuperAlpideSegment(bool isTestDetectorToLocal = false,
                   float xLocal_translate = 0;
                   float yLocal_translate = 0;
 
-                  SuperSegmentations[iLayer].detectorToLocal(row, col, xLocal, zLocal);
-                  SuperSegmentations[iLayer].flatToCurved(xLocal, 0., xCurved, yCurved);
+                  SegmentationsIB[iLayer].detectorToLocal(row, col, xLocal, zLocal);
+                  SegmentationsIB[iLayer].flatToCurved(xLocal, 0., xCurved, yCurved);
                   double posLocal[3] = {xCurved, yCurved, zLocal};
                   double posGlobal[3] = {0, 0, 0};
-                  SuperSegmentations[iLayer].curvedToFlat(xCurved, yCurved, xLocal_translate, yLocal_translate);
+                  SegmentationsIB[iLayer].curvedToFlat(xCurved, yCurved, xLocal_translate, yLocal_translate);
                   matrix->LocalToMaster(posLocal, posGlobal);
 
                   h_xCurved_yCurved->Fill(xLocal, 0);

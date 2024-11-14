@@ -37,7 +37,7 @@
 #include "ITS3Base/SpecsV2.h"
 #include "CommonConstants/MathConstants.h"
 #include "DataFormatsITSMFT/Digit.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 #include "DetectorsBase/GeometryManager.h"
 #include "ITSBase/GeometryTGeo.h"
 #include "fairlogger/Logger.h"
@@ -56,7 +56,7 @@ constexpr double qedRate = qedXSection / hadXSection * interaction_rate; // Hz
 constexpr double qedFactor = qedRate * integration_time;                 // a.u.
 using o2::itsmft::Digit;
 namespace its3 = o2::its3;
-using SSAlpide = its3::SegmentationSuperAlpide;
+using SSAlpide = its3::SegmentationMosaix;
 
 void checkFile(const std::unique_ptr<TFile>& file);
 
@@ -103,8 +103,8 @@ void CheckDigitsDensity(int nEvents = 10000, std::string digitFileName = "it3dig
       // goto curved coordinates
       float x{0.f}, y{0.f}, z{0.f};
       float xFlat{0.f}, yFlat{0.f};
-      its3::SuperSegmentations[layer].detectorToLocal(row, col, xFlat, z);
-      its3::SuperSegmentations[layer].flatToCurved(xFlat, 0., x, y);
+      its3::SegmentationsIB[layer].detectorToLocal(row, col, xFlat, z);
+      its3::SegmentationsIB[layer].flatToCurved(xFlat, 0., x, y);
       const o2::math_utils::Point3D<double> locD(x, y, z);
       const auto gloD = gman->getMatrixL2G(id)(locD); // convert to global
       const auto R = std::hypot(gloD.X(), gloD.Y());

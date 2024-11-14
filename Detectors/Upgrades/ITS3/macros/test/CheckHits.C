@@ -31,7 +31,7 @@
 
 #define ENABLE_UPGRADES
 #include "CommonConstants/MathConstants.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 #include "ITS3Base/SpecsV2.h"
 #include "ITSMFTSimulation/Hit.h"
 #include "SimulationDataFormat/MCTrack.h"
@@ -39,7 +39,6 @@
 
 namespace it3c = o2::its3::constants;
 namespace it3d = it3c::detID;
-using SSAlpide = o2::its3::SegmentationSuperAlpide;
 using o2::itsmft::Hit;
 
 constexpr double interaction_rate = 50e3;                                // Hz

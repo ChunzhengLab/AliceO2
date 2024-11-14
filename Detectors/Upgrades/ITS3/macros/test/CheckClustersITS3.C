@@ -25,7 +25,7 @@
 #define ENABLE_UPGRADES
 #include "DetectorsCommonDataFormats/DetID.h"
 #include "ITSMFTBase/SegmentationAlpide.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 #include "ITS3Base/SpecsV2.h"
 #include "ITSBase/GeometryTGeo.h"
 #include "DataFormatsITSMFT/CompCluster.h"
@@ -50,7 +50,7 @@ void CheckClustersITS3(const std::string& clusfile = "o2clus_its.root",
   using namespace o2::base;
   using namespace o2::its;
 
-  using SuperSegmentation = o2::its3::SegmentationSuperAlpide;
+  using SuperSegmentation = o2::its3::SegmentationMosaix;
   using Segmentation = o2::itsmft::SegmentationAlpide;
   using o2::itsmft::CompClusterExt;
   using o2::itsmft::Hit;
@@ -100,7 +100,7 @@ void CheckClustersITS3(const std::string& clusfile = "o2clus_its.root",
     LOG(info) << "Running with dictionary: " << dictfile.c_str();
     dict.readFromFile(dictfile);
   } else {
-    LOG(info) << "Running without dictionary !";
+    LOG(error) << "No dictionary file found: " << dictfile.c_str();
   }
 
   // ROFrecords
@@ -234,10 +234,10 @@ void CheckClustersITS3(const std::string& clusfile = "o2clus_its.root",
       } else {
         // compare in local flat coordinates
         float xFlatEnd{0.}, yFlatEnd{0.};
-        o2::its3::SuperSegmentations[layer].curvedToFlat(locH.X(), locH.Y(), xFlatEnd, yFlatEnd);
+        o2::its3::SegmentationsIB[layer].curvedToFlat(locH.X(), locH.Y(), xFlatEnd, yFlatEnd);
         locH.SetXYZ(xFlatEnd, yFlatEnd, locH.Z());
         float xFlatSta{0.}, yFlatSta{0.};
-        o2::its3::SuperSegmentations[layer].curvedToFlat(locHsta.X(), locHsta.Y(), xFlatSta, yFlatSta);
+        o2::its3::SegmentationsIB[layer].curvedToFlat(locHsta.X(), locHsta.Y(), xFlatSta, yFlatSta);
         locHsta.SetXYZ(xFlatSta, yFlatSta, locHsta.Z());
         // recalculate x/y in flat
         // x0 = xFlatSta, dltx = xFlatEnd - x0;
@@ -248,7 +248,7 @@ void CheckClustersITS3(const std::string& clusfile = "o2clus_its.root",
         // not really precise, but okish
         locH.SetXYZ(0.5f * (locH.X() + locHsta.X()), 0.5f * (locH.Y() + locHsta.Y()), 0.5f * (locH.Z() + locHsta.Z()));
 
-        o2::its3::SuperSegmentations[layer].curvedToFlat(locC.X(), locC.Y(), xFlatSta, yFlatSta);
+        o2::its3::SegmentationsIB[layer].curvedToFlat(locC.X(), locC.Y(), xFlatSta, yFlatSta);
         locC.SetXYZ(xFlatSta, yFlatSta, locC.Z());
       }
 

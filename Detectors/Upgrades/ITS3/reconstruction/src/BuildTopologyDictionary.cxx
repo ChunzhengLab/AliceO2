@@ -14,7 +14,7 @@
 #include "ITS3Reconstruction/BuildTopologyDictionary.h"
 #include "ITS3Reconstruction/LookUp.h"
 #include "DataFormatsITSMFT/CompCluster.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 
 #include "TFile.h"
 

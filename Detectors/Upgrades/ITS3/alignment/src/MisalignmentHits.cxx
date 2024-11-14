@@ -10,7 +10,7 @@
 // or submit itself to any jurisdiction.
 
 #include "ITS3Align/MisalignmentHits.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 #include "ITS3Base/ITS3Params.h"
 #include "SimConfig/DigiParams.h"
 #include "DetectorsBase/Propagator.h"

@@ -9,12 +9,12 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 
-ClassImp(o2::its3::SegmentationSuperAlpide);
+ClassImp(o2::its3::SegmentationMosaix);
 
 namespace o2::its3
 {
 
-const std::array<SegmentationSuperAlpide, constants::nLayers> SuperSegmentations{0, 1, 2};
+const std::array<SegmentationMosaix, constants::nLayers> SegmentationsIB{0, 1, 2};
 }

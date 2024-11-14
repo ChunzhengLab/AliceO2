@@ -34,7 +34,7 @@
 #include "DetectorsCommonDataFormats/DetID.h"
 #include "ITSBase/GeometryTGeo.h"
 #include "ITSMFTBase/SegmentationAlpide.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 #include "DataFormatsITSMFT/CompCluster.h"
 #include "DataFormatsITSMFT/ClusterTopology.h"
 #include "ITS3Reconstruction/TopologyDictionary.h"
@@ -67,7 +67,7 @@ void CreateDictionariesITS3(bool saveDeltas = false,
   using namespace o2::base;
   using namespace o2::its;
 
-  using o2::its3::SegmentationSuperAlpide;
+  using o2::its3::SegmentationMosaix;
   using Segmentation = o2::itsmft::SegmentationAlpide;
   using o2::its3::BuildTopologyDictionary;
   using o2::itsmft::ClusterTopology;
@@ -274,15 +274,15 @@ void CreateDictionariesITS3(bool saveDeltas = false,
                 int layer = gman->getLayer(chipID);
                 if (isIB) {
                   float xFlat{0.}, yFlat{0.};
-                  o2::its3::SuperSegmentations[layer].curvedToFlat(xyzLocM.X(), xyzLocM.Y(), xFlat, yFlat);
+                  o2::its3::SegmentationsIB[layer].curvedToFlat(xyzLocM.X(), xyzLocM.Y(), xFlat, yFlat);
                   xyzLocM.SetCoordinates(xFlat, yFlat, xyzLocM.Z());
-                  o2::its3::SuperSegmentations[layer].curvedToFlat(locC.X(), locC.Y(), xFlat, yFlat);
+                  o2::its3::SegmentationsIB[layer].curvedToFlat(locC.X(), locC.Y(), xFlat, yFlat);
                   locC.SetCoordinates(xFlat, yFlat, locC.Z());
                 }
                 dX = xyzLocM.X() - locC.X();
                 dZ = xyzLocM.Z() - locC.Z();
-                dX /= (isIB) ? o2::its3::SegmentationSuperAlpide::mPitchRow : o2::itsmft::SegmentationAlpide::PitchRow;
-                dZ /= (isIB) ? o2::its3::SegmentationSuperAlpide::mPitchCol : o2::itsmft::SegmentationAlpide::PitchCol;
+                dX /= (isIB) ? o2::its3::SegmentationMosaix::mPitchRow : o2::itsmft::SegmentationAlpide::PitchRow;
+                dZ /= (isIB) ? o2::its3::SegmentationMosaix::mPitchCol : o2::itsmft::SegmentationAlpide::PitchCol;
                 if (saveDeltas) {
                   nt->Fill(topology.getHash(), dX, dZ);
                 }

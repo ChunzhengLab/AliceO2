@@ -92,7 +92,7 @@ void ITS3Layer::createPixelArray()
   }
   // A pixel array is pure silicon and the sensitive part of our detector.
   // It will be segmented into a 442x156 matrix by the
-  // SuperSegmentationAlpide.
+  // SegmentationMosaix class.
   // Pixel Array is just a longer version of the biasing but starts in phi at
   // biasPhi2.
   using namespace its3c::pixelarray;

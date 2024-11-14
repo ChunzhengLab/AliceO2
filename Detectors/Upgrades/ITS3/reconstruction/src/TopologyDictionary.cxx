@@ -12,7 +12,7 @@
 /// \file TopologyDictionary.cxx
 
 #include "ITS3Reconstruction/TopologyDictionary.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 #include "ITSMFTBase/SegmentationAlpide.h"
 #include "CommonUtils/StringUtils.h"
 #include <TFile.h>
@@ -143,11 +143,11 @@ math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::C
     locCl.SetZ(locCl.Z() + this->getZCOG(cl.getPatternID()) * itsmft::SegmentationAlpide::PitchCol);
   } else {
     auto layer = its3::constants::detID::getDetID2Layer(cl.getSensorID());
-    its3::SuperSegmentations[layer].detectorToLocalUnchecked(cl.getRow(), cl.getCol(), locCl);
-    locCl.SetX(locCl.X() + this->getXCOG(cl.getPatternID()) * its3::SegmentationSuperAlpide::mPitchRow);
-    locCl.SetZ(locCl.Z() + this->getZCOG(cl.getPatternID()) * its3::SegmentationSuperAlpide::mPitchCol);
+    its3::SegmentationsIB[layer].detectorToLocalUnchecked(cl.getRow(), cl.getCol(), locCl);
+    locCl.SetX(locCl.X() + this->getXCOG(cl.getPatternID()) * its3::SegmentationMosaix::mPitchRow);
+    locCl.SetZ(locCl.Z() + this->getZCOG(cl.getPatternID()) * its3::SegmentationMosaix::mPitchCol);
     float xCurved{0.f}, yCurved{0.f};
-    its3::SuperSegmentations[layer].flatToCurved(locCl.X(), locCl.Y(), xCurved, yCurved);
+    its3::SegmentationsIB[layer].flatToCurved(locCl.X(), locCl.Y(), xCurved, yCurved);
     locCl.SetXYZ(xCurved, yCurved, locCl.Z());
   }
   return locCl;
@@ -169,9 +169,9 @@ math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::C
     o2::itsmft::SegmentationAlpide::detectorToLocalUnchecked(refRow + xCOG, refCol + zCOG, locCl);
   } else {
     auto layer = its3::constants::detID::getDetID2Layer(cl.getSensorID());
-    its3::SuperSegmentations[layer].detectorToLocalUnchecked(refRow + xCOG, refCol + zCOG, locCl);
+    its3::SegmentationsIB[layer].detectorToLocalUnchecked(refRow + xCOG, refCol + zCOG, locCl);
     float xCurved{0.f}, yCurved{0.f};
-    its3::SuperSegmentations[layer].flatToCurved(locCl.X(), locCl.Y(), xCurved, yCurved);
+    its3::SegmentationsIB[layer].flatToCurved(locCl.X(), locCl.Y(), xCurved, yCurved);
     locCl.SetXYZ(xCurved, yCurved, locCl.Z());
   }
   return locCl;

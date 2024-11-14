@@ -24,8 +24,7 @@
 
 #ifdef ENABLE_UPGRADES
 #include "ITS3Base/SpecsV2.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
-using SuperSegmentation = o2::its3::SegmentationSuperAlpide;
+#include "ITS3Base/SegmentationMosaix.h"
 #endif
 
 #include <TGeoBBox.h>         // for TGeoBBox
@@ -423,7 +422,7 @@ TGeoHMatrix* GeometryTGeo::extractMatrixSensor(int index) const
   double delta = Segmentation::SensorLayerThickness - Segmentation::SensorLayerThicknessEff;
 #ifdef ENABLE_UPGRADES
   if (mIsLayerITS3[getLayer(index)]) {
-    delta = its3::SegmentationSuperAlpide::mSensorLayerThickness - its3::SegmentationSuperAlpide::mSensorLayerThicknessEff;
+    delta = its3::SegmentationMosaix::mSensorLayerThickness - its3::SegmentationMosaix::mSensorLayerThicknessEff;
   }
 #endif
 
