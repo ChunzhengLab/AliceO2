@@ -90,14 +90,17 @@ class AlpideSimResponse
   int getRowBin(float pos) const;
   int getDepthBin(float pos) const;
   std::string composeDataName(int colBin, int rowBin);
+  bool isColRowMaxSet() const { return mColMax > 0 && mRowMax > 0; }
 
   int mNBinCol = 0;                                   /// number of bins in X(col direction)
   int mNBinRow = 0;                                   /// number of bins in Y(row direction)
   int mNBinDpt = 0;                                   /// number of bins in Z(sensor dept)
   int mMaxBinCol = 0;                                 /// max allowed Xb (to avoid subtraction)
   int mMaxBinRow = 0;                                 /// max allowed Yb (to avoid subtraction)
-  float mColMax = SegmentationAlpide::PitchCol / 2.f; /// upper boundary of Col
-  float mRowMax = SegmentationAlpide::PitchRow / 2.f; /// upper boundary of Row
+  // float mColMax = SegmentationAlpide::PitchCol / 2.f; /// upper boundary of Col
+  // float mRowMax = SegmentationAlpide::PitchRow / 2.f; /// upper boundary of Row
+  float mColMax = -0.f;                               /// upper boundary of Col
+  float mRowMax = -0.f;                               /// upper boundary of Row
   float mDptMin = 0.f;                                /// lower boundary of Dpt
   float mDptMax = 0.f;                                /// upper boundary of Dpt
   float mDptShift = 0.f;                              /// shift of the depth center wrt 0
@@ -140,6 +143,8 @@ class AlpideSimResponse
   const std::string& getGridColName() const { return mGridColName; }
   const std::string& getGridRowName() const { return mGridRowName; }
   const std::string& getColRowDataFmt() const { return mColRowDataFmt; }
+  void setColMax(float val) { mColMax = val; }
+  void setRowMax(float val) { mRowMax = val; }
   void print() const;
 
   ClassDefNV(AlpideSimResponse, 1);

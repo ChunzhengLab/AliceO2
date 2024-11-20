@@ -26,17 +26,27 @@ else()
   set(ITSRESPONSE_DIR $ENV{ITSRESPONSE_ROOT})
 endif()
 
+if(NOT ITSRESPONSE_DIR)
+  message(FATAL_ERROR "Neither ITSRESPONSE option nor ITSRESPONSE_ROOT environment variable is set!")
+endif()
+
+# Combine both response data generation into one command
 add_custom_command(TARGET O2exe-alpide-response-generator POST_BUILD
-                   COMMAND ${CMAKE_BINARY_DIR}/stage/bin/o2-alpide-response-generator -i ${ITSRESPONSE_DIR}/response/AlpideResponseData/ -o ${CMAKE_CURRENT_BINARY_DIR}/
+                   COMMAND ${CMAKE_BINARY_DIR}/stage/bin/o2-alpide-response-generator -i ${ITSRESPONSE_DIR}/response/AlpideResponseData/ -o ${CMAKE_CURRENT_BINARY_DIR}/ -c "Alpide"
+                   COMMAND ${CMAKE_BINARY_DIR}/stage/bin/o2-alpide-response-generator -i ${ITSRESPONSE_DIR}/response/ITS3ChipResponseData/AptsResponseData/ -o ${CMAKE_CURRENT_BINARY_DIR}/ -c "Apts"
                    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/AlpideResponseData.root
+                              ${CMAKE_CURRENT_BINARY_DIR}/AptsResponseData.root
                    DEPENDS alpide-response-generator
-                   COMMENT "Generating AlpideResponseData.root"
+                   COMMENT "Generating AlpideResponseData.root and AptsResponseData.root"
 )
 
-# # Add a target that depends on the custom command output
+# Add a custom target to depend on both files
 add_custom_target(
   GenerateAlpideResponse ALL
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/AlpideResponseData.root
+          ${CMAKE_CURRENT_BINARY_DIR}/AptsResponseData.root
 )
 
+# Install the generated files
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/AlpideResponseData.root" DESTINATION "${CMAKE_INSTALL_PREFIX}/share/Detectors/ITSMFT/data/AlpideResponseData/")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/AptsResponseData.root" DESTINATION "${CMAKE_INSTALL_PREFIX}/share/Detectors/Upgrade/ITS3/data/ITS3ChipResponseData/")

@@ -32,6 +32,11 @@ constexpr float micron2cm = 1e-4;
 
 void AlpideSimResponse::initData(int tableNumber, std::string dataPath, const bool quiet)
 {
+  // check if the col and row max are set: we have more than alpide response now.
+  if (!isColRowMaxSet()) {
+    LOG(fatal) << "Chip pitch not set.";
+    return;
+  }
   /*
    * read grid parameters and load data
    */
