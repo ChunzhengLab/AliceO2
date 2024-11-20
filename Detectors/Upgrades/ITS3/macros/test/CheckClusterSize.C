@@ -43,6 +43,7 @@
 #include "SimulationDataFormat/MCCompLabel.h"
 #include "SimulationDataFormat/MCEventHeader.h"
 #include "SimulationDataFormat/MCTrack.h"
+#include "ITS3Base/SpecsV2.h"
 #endif
 #define ENABLE_UPGRADES
 #include "SimulationDataFormat/MCTruthContainer.h"
@@ -59,13 +60,18 @@ struct ParticleInfo {
 };
 
 using o2::itsmft::CompClusterExt;
+using namespace o2::its3::constants::detID;
 using ROFRec = o2::itsmft::ROFRecord;
 
 void checkFile(const std::unique_ptr<TFile>& file);
 
-inline auto hist_map(unsigned short id)
+inline unsigned short hist_map(unsigned short id)
 {
-  return std::clamp(id, static_cast<unsigned short>(0), static_cast<unsigned short>(6)) / 2;
+  if (isDetITS3) {
+    return std::clamp(id, static_cast<unsigned short>(0), static_cast<unsigned short>(nLayers - 1));
+  } else {
+    return 3; // outer barrel
+  }
 }
 
 void CheckClusterSize(std::string clusFileName = "o2clus_its.root",
@@ -266,7 +272,7 @@ void CheckClusterSize(std::string clusFileName = "o2clus_its.root",
       const int trackID = label.getTrackID();
       int evID = label.getEventID();
       const auto& pInfo = info[evID][trackID];
-      if (id > 6) {
+      if (isDetITS3) {
         hOuterBarrel.Fill(clusterSize);
       }
 
