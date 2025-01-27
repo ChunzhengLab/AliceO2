@@ -140,10 +140,10 @@ void CheckMosaixSegmentTrans()
       g_arc_inner->AddPoint(x_inner, y_inner);
       g_arc_outer->AddPoint(x_outer, y_outer);
       // Test Segmentation
-      Segmentations[iLayer].curvedToFlat(x_inner, y_inner, x_inner_flat, y_inner_flat);
-      Segmentations[iLayer].flatToCurved(x_inner_flat, y_inner_flat, x_inner_curved, y_inner_curved);
-      Segmentations[iLayer].curvedToFlat(x_outer, y_outer, x_outer_flat, y_outer_flat);
-      Segmentations[iLayer].flatToCurved(x_outer_flat, y_outer_flat, x_outer_curved, y_outer_curved);
+      SegmentationsIB[iLayer].curvedToFlat(x_inner, y_inner, x_inner_flat, y_inner_flat);
+      SegmentationsIB[iLayer].flatToCurved(x_inner_flat, y_inner_flat, x_inner_curved, y_inner_curved);
+      SegmentationsIB[iLayer].curvedToFlat(x_outer, y_outer, x_outer_flat, y_outer_flat);
+      SegmentationsIB[iLayer].flatToCurved(x_outer_flat, y_outer_flat, x_outer_curved, y_outer_curved);
       g_arc_inner_flat->AddPoint(x_inner_flat, y_inner_flat);
       g_arc_outer_flat->AddPoint(x_outer_flat, y_outer_flat);
       h_f2c_res->Fill(x_inner - x_inner_curved, y_inner - y_inner_curved);
@@ -201,10 +201,8 @@ void CheckMosaixSegmentTrans()
       for (int iCol{0}; iCol < nCols; ++iCol) {
         float xRow{0}, zCol{0};
         int iiRow{0}, iiCol{0};
-        auto v1 =
-          Segmentations[iLayer].detectorToLocal(iRow, iCol, xRow, zCol);
-        auto v2 = Segmentations[iLayer].localToDetector(xRow, zCol, iiRow,
-                                                             iiCol);
+        auto v1 = SegmentationsIB[iLayer].detectorToLocal(iRow, iCol, xRow, zCol);
+        auto v2 = SegmentationsIB[iLayer].localToDetector(xRow, zCol, iiRow, iiCol);
         // Info("L2D",
         //      "iRow=%d, iCol=%d --d2l(%s)--> xRow=%f, zCol=%f --l2d(%s)--> "
         //      "iiRow=%d, iiCol=%d",

@@ -103,7 +103,6 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
   TFile::Open(clusfile.data());
   TTree* clusTree = (TTree*)gFile->Get("o2sim");
   std::vector<o2::itsmft::CompClusterExt>* clusArr = nullptr;
-  std::vector<CompClusterExt>* clusArrITS = nullptr;
   clusTree->SetBranchAddress("ITSClusterComp", &clusArr);
   // Cluster MC labels
   o2::dataformats::MCTruthContainer<o2::MCCompLabel>* clusLabArr = nullptr;
@@ -129,31 +128,38 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
       auto part = mcArr->at(mcI);
       info[n][mcI].pvx = mcEvent->GetX();
       info[n][mcI].pvy = mcEvent->GetY();
-      info[n][mcI].pvz = mcEvent->GetZ();
+      info[n][mcI].pvz = mcEvent->GetZ();    // 这次进入了reco track tree的time frame
       info[n][mcI].event = n;
       info[n][mcI].pdg = part.GetPdgCode();
       info[n][mcI].pt = part.GetPt();
       info[n][mcI].phi = part.GetPhi();
       info[n][mcI].eta = part.GetEta();
       info[n][mcI].isPrimary = part.isPrimary();
+
+      // 这里循环了mc事件的每一个track，已经写入了他真实的(来自仿真的)运动学信息
     }
   }
+
   std::cout << "done." << std::endl;
 
   std::cout << "** Creating particle/clusters correspondance ... "
             << std::flush;
 
-  for (int frame = 0; frame < clusTree->GetEntriesFast();
-       frame++) { // Cluster frames
+  for (int frame = 0; frame < clusTree->GetEntriesFast(); frame++) { // Cluster frames
     if (clusTree->GetEvent(frame) == 0) {
       continue;
     }
 
-    auto clssize = clusArr->size();
-    std::cout << clssize << std::endl;
+    auto nClus = clusArr->size();
+    std::cout << nClus << std::endl;
 
-    for (unsigned int iClus{0}; iClus < clssize; ++iClus) {
-      auto lab = (clusLabArr->getLabels(iClus))[0];
+    for (unsigned int iClus{0}; iClus < nClus; ++iClus) {
+      // 这里是进入了cluster tree的time frame
+      // 可以从clusTree中读取到cluster的
+      // 1. 属于哪个event，哪个track
+      // 3. 属于哪个chip
+      // 在这个loop中，填入了info的clusters字段，这个字段是一个bitmask，每个bit代表一个layer，也就是说知道了某一个具体的track，它在哪些layer上有cluster
+      auto lab = (clusLabArr->getLabels(iClus))[0]; // 
       if (!lab.isValid() || lab.getSourceID() != 0 || !lab.isCorrect()) {
         continue;
       }
@@ -172,20 +178,23 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
 
       const CompClusterExt& c = (*clusArr)[iClus];
       auto layer = gman->getLayer(c.getSensorID());
-      info[evID][trackID].clusters |= 1 << layer;
+      info[evID][trackID].clusters |= 1 << layer; 
     }
   }
   std::cout << "done." << std::endl;
 
   std::cout << "** Analysing tracks ... " << std::flush;
   ULong_t unaccounted{0}, good{0}, fakes{0}, total{0};
-  for (int frame = 0; frame < recTree->GetEntriesFast();
-       frame++) { // Cluster frames
+  for (int frame = 0; frame < recTree->GetEntriesFast(); frame++) { // reco tracks frames
     if (recTree->GetEvent(frame) == 0) {
       continue;
     }
     total += trkLabArr->size();
     for (unsigned int iTrack{0}; iTrack < trkLabArr->size(); ++iTrack) {
+      // 这次进入了reco track tree的time frame
+      // 还是可以得到track的
+      // 1. 属于哪个event，哪个track
+      // 2. 属于哪个source，是不是一个fake track
       auto lab = trkLabArr->at(iTrack);
       if (!lab.isSet()) {
         unaccounted++;
@@ -208,6 +217,7 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
       if (recArr->at(iTrack).isBetter(info[evID][trackID].track, 1.e9)) {
         info[evID][trackID].storedStatus = fake;
         info[evID][trackID].track = recArr->at(iTrack);
+        // 这里直接把reco track的信息写入了info的track字段，只是在这个track是最好的情况下
         float ip[2]{0., 0.};
         info[evID][trackID].track.getImpactParams(info[evID][trackID].pvx, info[evID][trackID].pvy, info[evID][trackID].pvz, bz, ip);
         info[evID][trackID].dcaxy = ip[0];

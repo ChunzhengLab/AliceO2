@@ -27,7 +27,7 @@
 #define ENABLE_UPGRADES
 #include "ITSBase/GeometryTGeo.h"
 #include "DataFormatsITSMFT/Digit.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 #include "ITSMFTBase/SegmentationAlpide.h"
 #include "ITSMFTSimulation/Hit.h"
 #include "MathUtils/Utils.h"
@@ -165,8 +165,8 @@ void CheckDigitsITS3(std::string digifile = "it3digits.root", std::string hitfil
       if (isIB) {
         // ITS3 IB
         float xFlat{0.f}, yFlat{0.f};
-        its3::SuperSegmentations[layer].detectorToLocal(ix, iz, xFlat, z);
-        its3::SuperSegmentations[layer].flatToCurved(xFlat, 0., x, y);
+        its3::SegmentationsIB[layer].detectorToLocal(ix, iz, xFlat, z);
+        its3::SegmentationsIB[layer].flatToCurved(xFlat, 0., x, y);
       } else {
         // ITS2 OB
         SegmentationAlpide::detectorToLocal(ix, iz, x, z);
@@ -202,12 +202,12 @@ void CheckDigitsITS3(std::string digifile = "it3digits.root", std::string hitfil
 
       if (isIB) {
         float xFlat{0.}, yFlat{0.};
-        its3::SuperSegmentations[layer].curvedToFlat(xyzLocM.X(), xyzLocM.Y(), xFlat, yFlat);
+        its3::SegmentationsIB[layer].curvedToFlat(xyzLocM.X(), xyzLocM.Y(), xFlat, yFlat);
         xyzLocM.SetCoordinates(xFlat, yFlat, xyzLocM.Z());
-        its3::SuperSegmentations[layer].curvedToFlat(locD.X(), locD.Y(), xFlat, yFlat);
+        its3::SegmentationsIB[layer].curvedToFlat(locD.X(), locD.Y(), xFlat, yFlat);
         locD.SetCoordinates(xFlat, yFlat, locD.Z());
-        if (auto v1 = !its3::SuperSegmentations[layer].localToDetector(xyzLocM.X(), xyzLocM.Z(), row, col),
-            v2 = !its3::SuperSegmentations[layer].detectorToLocal(row, col, xlc, zlc);
+        if (auto v1 = !its3::SegmentationsIB[layer].localToDetector(xyzLocM.X(), xyzLocM.Z(), row, col),
+            v2 = !its3::SegmentationsIB[layer].detectorToLocal(row, col, xlc, zlc);
             v1 || v2) {
           continue;
         }

@@ -31,7 +31,7 @@
 #include "DataFormatsITSMFT/ROFRecord.h"
 #include "DetectorsCommonDataFormats/DetID.h"
 #include "DetectorsCommonDataFormats/DetectorNameConf.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 #include "ITS3Base/SpecsV2.h"
 #include "ITS3Reconstruction/TopologyDictionary.h"
 #include "ITSBase/GeometryTGeo.h"
@@ -86,7 +86,7 @@ void CompareClustersAndDigits(std::string clusfile = "o2clus_it3.root",
 
   using namespace o2::base;
   using o2::itsmft::Hit;
-  using SuperSegmentation = o2::its3::SegmentationSuperAlpide;
+  using SuperSegmentation = o2::its3::SegmentationMosaix;
   using Segmentation = o2::itsmft::SegmentationAlpide;
   using o2::itsmft::CompClusterExt;
   using ROFRec = o2::itsmft::ROFRecord;
@@ -124,15 +124,16 @@ void CompareClustersAndDigits(std::string clusfile = "o2clus_it3.root",
   TFile fileC(clusfile.data());
   auto* clusTree = dynamic_cast<TTree*>(fileC.Get("o2sim"));
   std::vector<CompClusterExt>* clusArr = nullptr;
-  clusTree->SetBranchAddress("IT3ClusterComp", &clusArr);
+  clusTree->SetBranchAddress("ITSClusterComp", &clusArr);
   std::vector<unsigned char>* patternsPtr = nullptr;
-  auto pattBranch = clusTree->GetBranch("IT3ClusterPatt");
+  auto pattBranch = clusTree->GetBranch("ITSClusterPatt");
   if (pattBranch != nullptr) {
     pattBranch->SetAddress(&patternsPtr);
   }
   if (dictfile.empty()) {
     dictfile = o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(o2::detectors::DetID::IT3, "", "root");
   }
+
   o2::its3::TopologyDictionary dict;
   std::ifstream file(dictfile.c_str());
   if (file.good()) {
@@ -144,14 +145,14 @@ void CompareClustersAndDigits(std::string clusfile = "o2clus_it3.root",
 
   // ROFrecords
   std::vector<ROFRec> rofRecVec, *rofRecVecP = &rofRecVec;
-  clusTree->SetBranchAddress("IT3ClustersROF", &rofRecVecP);
+  clusTree->SetBranchAddress("ITSClustersROF", &rofRecVecP);
 
   // Cluster MC labels
   o2::dataformats::MCTruthContainer<o2::MCCompLabel>* clusLabArr = nullptr;
   std::vector<MC2ROF> mc2rofVec, *mc2rofVecP = &mc2rofVec;
-  if ((hitTree != nullptr) && (clusTree->GetBranch("IT3ClusterMCTruth") != nullptr)) {
-    clusTree->SetBranchAddress("IT3ClusterMCTruth", &clusLabArr);
-    clusTree->SetBranchAddress("IT3ClustersMC2ROF", &mc2rofVecP);
+  if ((hitTree != nullptr) && (clusTree->GetBranch("ITSClusterMCTruth") != nullptr)) {
+    clusTree->SetBranchAddress("ITSClusterMCTruth", &clusLabArr);
+    clusTree->SetBranchAddress("ITSClustersMC2ROF", &mc2rofVecP);
   }
 
   clusTree->GetEntry(0);
@@ -188,7 +189,7 @@ void CompareClustersAndDigits(std::string clusfile = "o2clus_it3.root",
   std::vector<Data> data(nChips);
   for (int iChip{0}; iChip < nChips; ++iChip) {
     auto& dat = data[iChip];
-    int col{o2::its3::SegmentationSuperAlpide::mNCols}, row{o2::its3::SegmentationSuperAlpide::mNRows};
+    int col{o2::its3::SegmentationMosaix::mNCols}, row{o2::its3::SegmentationMosaix::mNRows};
     if (!o2::its3::constants::detID::isDetITS3(iChip)) {
       col = o2::itsmft::SegmentationAlpide::NCols;
       row = o2::itsmft::SegmentationAlpide::NRows;
@@ -232,6 +233,8 @@ void CompareClustersAndDigits(std::string clusfile = "o2clus_it3.root",
     }
   }
 
+  TFile* f = TFile::Open("test.root", "RECREATE");
+  TH1D* h_ib_locx = new TH1D("h_ib_locx", "h_ib_locx", 1000, -5, 5);
   LOGP(info, "Building min and max MC events used by each ROF");
   auto pattIt = patternsPtr->cbegin();
   for (unsigned int irof = 0; irof < nROFRec; irof++) {
@@ -282,31 +285,43 @@ void CompareClustersAndDigits(std::string clusfile = "o2clus_it3.root",
       o2::math_utils::Point3D<float> locHMiddle;
       if (isIB) {
         float xFlat{0.}, yFlat{0.};
-        o2::its3::SuperSegmentations[layer].curvedToFlat(locHEnd.X(), locHEnd.Y(), xFlat, yFlat);
+        o2::its3::SegmentationsIB[layer].curvedToFlat(locHEnd.X(), locHEnd.Y(), xFlat, yFlat);
         locHEnd.SetXYZ(xFlat, yFlat, locHEnd.Z());
-        o2::its3::SuperSegmentations[layer].curvedToFlat(locHStart.X(), locHStart.Y(), xFlat, yFlat);
+        o2::its3::SegmentationsIB[layer].curvedToFlat(locHStart.X(), locHStart.Y(), xFlat, yFlat);
         locHStart.SetXYZ(xFlat, yFlat, locHStart.Z());
+        o2::its3::SegmentationsIB[layer].curvedToFlat(locC.X(), locC.Y(), xFlat, yFlat);
+        locC.SetXYZ(xFlat, yFlat, locC.Z());
       }
       locHMiddle.SetXYZ(0.5f * (locHEnd.X() + locHStart.X()), 0.5f * (locHEnd.Y() + locHStart.Y()), 0.5f * (locHEnd.Z() + locHStart.Z()));
 
       int rowHS, colHS, rowHM, colHM, rowHE, colHE, colC, rowC;
       bool v1, v2, v3, v4;
       if (isIB) {
-        v1 = o2::its3::SuperSegmentations[layer].localToDetector(locHStart.X(), locHStart.Z(), rowHS, colHS);
-        v2 = o2::its3::SuperSegmentations[layer].localToDetector(locHMiddle.X(), locHMiddle.Z(), rowHM, colHM);
-        v3 = o2::its3::SuperSegmentations[layer].localToDetector(locHEnd.X(), locHEnd.Z(), rowHE, colHE);
-        v4 = o2::its3::SuperSegmentations[layer].localToDetector(locC.X(), locC.Z(), rowC, colC);
+        h_ib_locx->Fill(locC.X());
+        v1 = o2::its3::SegmentationsIB[layer].localToDetector(locHStart.X(), locHStart.Z(), rowHS, colHS);
+        v2 = o2::its3::SegmentationsIB[layer].localToDetector(locHMiddle.X(), locHMiddle.Z(), rowHM, colHM);
+        v3 = o2::its3::SegmentationsIB[layer].localToDetector(locHEnd.X(), locHEnd.Z(), rowHE, colHE);
+        v4 = o2::its3::SegmentationsIB[layer].localToDetector(locC.X(), locC.Z(), rowC, colC);
       } else {
         v1 = o2::itsmft::SegmentationAlpide::localToDetector(locHStart.X(), locHStart.Z(), rowHS, colHS);
         v2 = o2::itsmft::SegmentationAlpide::localToDetector(locHMiddle.X(), locHMiddle.Z(), rowHM, colHM);
         v3 = o2::itsmft::SegmentationAlpide::localToDetector(locHEnd.X(), locHEnd.Z(), rowHE, colHE);
         v4 = o2::itsmft::SegmentationAlpide::localToDetector(locC.X(), locC.Z(), rowC, colC);
+        if (!v1 || !v2 || !v3 || !v4) {
+          // sometimes the transformation for hit start/end do not work since they can beyond the chip if they are
+          // at the edge, so for visualisation purposes we do not draw these clusters
+          continue;
+        }
       }
-      if (!v1 || !v2 || !v3 || !v4) {
-        // sometimes the transformation for hit start/end do not work since they can beyond the chip if they are
-        // at the edge, so for visualisation purposes we do not draw these clusters
-        continue;
-      }
+
+      // if(isIB) {
+      //   cout<<"we still have IB here before v1,v2,v3"<<endl;
+      // }
+      // if (!v1 || !v2 || !v3 || !v4) {
+      //   // sometimes the transformation for hit start/end do not work since they can beyond the chip if they are
+      //   // at the edge, so for visualisation purposes we do not draw these clusters
+      //   continue;
+      // }
 
       data[chipID].hitS->AddPoint(colHS, rowHS);
       data[chipID].hitM->AddPoint(colHM, rowHM);
@@ -328,30 +343,22 @@ void CompareClustersAndDigits(std::string clusfile = "o2clus_it3.root",
       data[chipID].vBoxes->push_back(box);
     }
   }
+  h_ib_locx->Write();
+  f->Write();
+  f->Close();
+  
 
   LOGP(info, "Writing to root file");
   double x1, y1, x2, y2;
   std::unique_ptr<TFile> oFile(TFile::Open("CompareClustersAndDigits.root", "RECREATE"));
-  for (int iChip{0}; iChip < nChips; ++iChip) {
+  oFile->cd();
+  for (int iChip{50}; iChip < 100; ++iChip) {
     if (iChip > 100) {
       break;
     }
     auto& dat = data[iChip];
-    gFile->cd();
-    /* auto path = gman->getMatrixPath(iChip); */
-    TString path; // TODO wrong use above
-    const std::string cpath{path.Data() + 39, path.Data() + path.Length()};
-    const std::filesystem::path p{cpath};
-    if (oFile->mkdir(p.parent_path().c_str(), "", true) == nullptr) {
-      LOGP(error, "Cannot create directories with path: %s", p.parent_path().c_str());
-      continue;
-    }
-    if (!gDirectory->cd(p.parent_path().c_str())) {
-      LOGP(error, "Failed to cd %s", p.parent_path().c_str());
-      continue;
-    }
-    auto canv = new TCanvas(Form("%s_%d", p.filename().c_str(), iChip));
-    canv->SetTitle(Form("%s_%d", p.filename().c_str(), iChip));
+    auto canv = new TCanvas(Form("Chip_%d", iChip));
+    canv->SetTitle(Form("Chip %d", iChip));
     canv->cd();
     gPad->SetGrid(1, 1);
     dat.pixelArray->Draw("colz");
@@ -364,7 +371,6 @@ void CompareClustersAndDigits(std::string clusfile = "o2clus_it3.root",
       b->Draw();
     }
     auto arr = new TArrow();
-    arr->SetArrowSize(0.02);
     for (int i{0}; i < dat.hitS->GetN(); ++i) {
       dat.hitS->GetPoint(i, x1, y1);
       dat.hitE->GetPoint(i, x2, y2);
@@ -374,11 +380,11 @@ void CompareClustersAndDigits(std::string clusfile = "o2clus_it3.root",
     dat.leg->Draw();
     canv->SetEditable(false);
 
-    gDirectory->WriteTObject(canv);
+    canv->Write();
     dat.clear();
     delete canv;
     delete arr;
-    printf("\rWriting chip %05d / %d", iChip, nChips - 1);
+    cout << "\rWriting chip " << std::setw(5) << std::setfill('0') << iChip << " / " << nChips - 1 << std::flush;
   }
   printf("\r\n");
   LOGP(info, "Finished!");

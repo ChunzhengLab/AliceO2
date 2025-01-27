@@ -91,6 +91,8 @@ void CheckClustersITS3(const std::string& clusfile = "o2clus_its.root",
   if (pattBranch != nullptr) {
     pattBranch->SetAddress(&patternsPtr);
   }
+
+  // Topology dictionary
   if (dictfile.empty()) {
     dictfile = o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(o2::detectors::DetID::IT3, "", "root");
   }
@@ -242,10 +244,10 @@ void CheckClustersITS3(const std::string& clusfile = "o2clus_its.root",
         // recalculate x/y in flat
         // x0 = xFlatSta, dltx = xFlatEnd - x0;
         // y0 = yFlatSta, dlty = yFlatEnd - y0;
-        // r = (0.5 * (SuperSegmentation::mSensorLayerThickness - SuperSegmentation::mSensorLayerThicknessEff) - y0) / dlty;
+        // r = 13.6e-4 / dlty;
         // locH.SetXYZ(x0 + r * dltx, y0 + r * dlty, z0 + r * dltz);
 
-        // not really precise, but okish
+        // // not really precise, but okish
         locH.SetXYZ(0.5f * (locH.X() + locHsta.X()), 0.5f * (locH.Y() + locHsta.Y()), 0.5f * (locH.Z() + locHsta.Z()));
 
         o2::its3::SegmentationsIB[layer].curvedToFlat(locC.X(), locC.Y(), xFlatSta, yFlatSta);
@@ -284,12 +286,24 @@ void CheckClustersITS3(const std::string& clusfile = "o2clus_its.root",
   canvdXdZ->Divide(2, 2);
   canvdXdZ->cd(1)->SetLogz();
   nt.Draw("dx:dz>>h_dx_vs_dz_IB(1000, -0.01, 0.01, 1000, -0.01, 0.01)", "id < 3456", "colz");
+  auto h = (TH2F*)gPad->GetPrimitive("h_dx_vs_dz_IB");
+  Info("IB", "RMS(dx)=%.1f mu", h->GetRMS(2) * 1e4);
+  Info("IB", "RMS(dz)=%.1f mu", h->GetRMS(1) * 1e4);
   canvdXdZ->cd(2)->SetLogz();
   nt.Draw("dx:dz>>h_dx_vs_dz_OB(1000, -0.01, 0.01, 1000, -0.01, 0.01)", "id >= 3456", "colz");
+  h = (TH2F*)gPad->GetPrimitive("h_dx_vs_dz_OB");
+  Info("OB", "RMS(dx)=%.1f mu", h->GetRMS(2) * 1e4);
+  Info("OB", "RMS(dz)=%.1f mu", h->GetRMS(1) * 1e4);
   canvdXdZ->cd(3)->SetLogz();
   nt.Draw("dx:dz>>h_dx_vs_dz_IB_z(1000, -0.01, 0.01, 1000, -0.01, 0.01)", "id < 3456 && abs(cgz) < 2", "colz");
+  h = (TH2F*)gPad->GetPrimitive("h_dx_vs_dz_IB_z");
+  Info("IB |z|<2", "RMS(dx)=%.1f mu", h->GetRMS(2) * 1e4);
+  Info("IB |z|<2", "RMS(dz)=%.1f mu", h->GetRMS(1) * 1e4);
   canvdXdZ->cd(4)->SetLogz();
   nt.Draw("dx:dz>>h_dx_vs_dz_OB_z(1000, -0.01, 0.01, 1000, -0.01, 0.01)", "id >= 3456 && abs(cgz) < 2", "colz");
+  h = (TH2F*)gPad->GetPrimitive("h_dx_vs_dz_OB_z");
+  Info("OB |z|<2", "RMS(dx)=%.1f mu", h->GetRMS(2) * 1e4);
+  Info("OB |z|<2", "RMS(dz)=%.1f mu", h->GetRMS(1) * 1e4);
   canvdXdZ->SaveAs("it3clusters_dx_vs_dz.pdf");
 
   auto c1 = new TCanvas("p1", "pullX");
