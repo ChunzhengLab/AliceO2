@@ -68,24 +68,11 @@ void checkFile(const std::unique_ptr<TFile>& file);
 
 inline unsigned short hist_map(unsigned short id)
 {
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-  if (isDetITS3) {
-    return std::clamp(id, static_cast<unsigned short>(0), static_cast<unsigned short>(nLayers - 1));
-  } else {
-    return 3; // outer barrel
-  }
-=======
-  if(isDetITS3(id)) {return getDetID2Layer(id);}
-  else {return nLayers - 1;}
->>>>>>> Stashed changes
-=======
   int lay = o2::its3::constants::detID::getDetID2Layer<int>(id);
   if (lay == -1) {
     return nLayers - 1;
   }
-  return lay;
->>>>>>> its3/matrix_gen
+  return static_cast<unsigned short>(lay);
 }
 
 void CheckClusterSize(std::string clusFileName = "o2clus_its.root",
@@ -291,12 +278,8 @@ void CheckClusterSize(std::string clusFileName = "o2clus_its.root",
       const int trackID = label.getTrackID();
       int evID = label.getEventID();
       const auto& pInfo = info[evID][trackID];
-<<<<<<< HEAD
 
       if (isDetITS3(id)) {
-=======
-      if (!o2::its3::constants::detID::isDetITS3(id)) {
->>>>>>> its3/matrix_gen
         hOuterBarrel.Fill(clusterSize);
       }
 

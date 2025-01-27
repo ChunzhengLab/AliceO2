@@ -361,9 +361,6 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     if (innerBarrel) {
       SegmentationsIB[layer].localToDetector(xyzLocS.X(), xyzLocS.Z(), row, col);
       SegmentationOB::localToDetector(xyzLocS.X(), xyzLocS.Z(), row, col);
-<<<<<<< HEAD
-        if (!SegmentationsIB[layer].detectorToLocal(row, col, cRowPix, cColPix)) {
-=======
         if (!mSuperSegmentations[layer].detectorToLocal(row, col, cRowPix, cColPix)) {
           continue;
       }
@@ -372,7 +369,6 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     }
     bool flipCol = false, flipRow = false;
     // note that response needs coordinates along column row (locX) (locZ) then depth (locY)
-<<<<<<< HEAD
     double rowMax{0.5f * (innerBarrel ? SegmentationIB::mPitchRow : SegmentationOB::PitchRow)};
     double colMax{0.5f * (innerBarrel ? SegmentationIB::mPitchCol : SegmentationOB::PitchCol)};
 
