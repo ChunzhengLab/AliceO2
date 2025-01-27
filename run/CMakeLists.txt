@@ -193,6 +193,8 @@ o2_add_test_command(NAME o2sim_G4
                                       2
                                       --skipModules
                                       MFT ZDC
+                                      --seed
+                                      15946057944514955802
                                       --configKeyValues
                                       "align-geom.mDetectors=none"
                     ENVIRONMENT "${SIMENV}"
@@ -255,6 +257,8 @@ o2_add_test_command(NAME o2sim_G3
                                       pythia8pp
                                       --chunkSize
                                       10
+                                      --seed
+                                      15946057944514955802
                                       --configKeyValues
                                       "align-geom.mDetectors=none"
                     LABELS g3 sim long
@@ -331,3 +335,7 @@ set_tests_properties(o2sim_G4_checklogs
 endif()
 
 install(FILES o2-sim-client.py PERMISSIONS GROUP_READ GROUP_EXECUTE OWNER_EXECUTE OWNER_WRITE OWNER_READ WORLD_EXECUTE WORLD_READ DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(DIRECTORY SimExamples/
+        DESTINATION examples
+        PATTERN *
+        PERMISSIONS GROUP_READ GROUP_EXECUTE OWNER_EXECUTE OWNER_WRITE OWNER_READ WORLD_EXECUTE WORLD_READ)

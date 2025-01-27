@@ -22,9 +22,7 @@
 #include "GPUO2DataTypes.h"
 #include "GPUTPCTrackParam.h"
 #include "GPUParam.inc"
-#if !defined(__OPENCL__) || defined(__OPENCLCPP__)
 #include "GPUTPCConvertImpl.h"
-#endif
 
 #if !defined(GPUCA_GPUCODE)
 #include <cstring>
@@ -81,7 +79,7 @@ void* GPUTPCTracker::SetPointersScratch(void* mem)
   if (mRec->GetProcessingSettings().memoryAllocationStrategy != GPUMemoryResource::ALLOCATION_INDIVIDUAL) {
     mem = SetPointersTracklets(mem);
   }
-  if (mRec->IsGPU()) {
+  if (mRec->GetRecoStepsGPU() & GPUDataTypes::RecoStep::TPCSliceTracking) {
     computePointerWithAlignment(mem, mTrackletTmpStartHits, GPUCA_ROW_COUNT * mNMaxRowStartHits);
     computePointerWithAlignment(mem, mRowStartHitCountOffset, GPUCA_ROW_COUNT);
   }
@@ -164,7 +162,7 @@ void GPUTPCTracker::SetMaxData(const GPUTrackingInOutPointers& io)
   mNMaxTracks = mRec->MemoryScalers()->NTPCSectorTracks(mData.NumberOfHits());
   mNMaxTrackHits = mRec->MemoryScalers()->NTPCSectorTrackHits(mData.NumberOfHits(), mRec->GetProcessingSettings().tpcInputWithClusterRejection);
 #ifdef GPUCA_SORT_STARTHITS_GPU
-  if (mRec->IsGPU()) {
+  if (mRec->GetRecoStepsGPU() & GPUDataTypes::RecoStep::TPCSliceTracking) {
     if (mNMaxStartHits > mNMaxRowStartHits * GPUCA_ROW_COUNT) {
       mNMaxStartHits = mNMaxRowStartHits * GPUCA_ROW_COUNT;
     }

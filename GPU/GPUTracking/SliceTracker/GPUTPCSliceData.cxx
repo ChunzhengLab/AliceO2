@@ -32,7 +32,7 @@ using namespace GPUCA_NAMESPACE::gpu;
 
 #ifndef GPUCA_GPUCODE
 
-void GPUTPCSliceData::InitializeRows(const MEM_CONSTANT(GPUParam) & p)
+void GPUTPCSliceData::InitializeRows(const GPUParam& p)
 {
   // initialisation of rows
   for (int32_t i = 0; i < GPUCA_ROW_COUNT + 1; ++i) {
@@ -109,7 +109,7 @@ void* GPUTPCSliceData::SetPointersRows(void* mem)
 
 #endif
 
-GPUd() void GPUTPCSliceData::GetMaxNBins(GPUconstantref() const MEM_CONSTANT(GPUConstantMem) * mem, GPUTPCRow* GPUrestrict() row, int32_t& maxY, int32_t& maxZ)
+GPUd() void GPUTPCSliceData::GetMaxNBins(GPUconstantref() const GPUConstantMem* mem, GPUTPCRow* GPUrestrict() row, int32_t& maxY, int32_t& maxZ)
 {
   maxY = row->mMaxY * 2.f / GPUCA_MIN_BIN_SIZE + 1;
   maxZ = (mem->param.continuousMaxTimeBin > 0 ? (mem->calibObjects.fastTransformHelper->getCorrMap()->convTimeToZinTimeFrame(0, 0, mem->param.continuousMaxTimeBin)) : mem->param.tpcGeometry.TPCLength()) + 50;
@@ -121,7 +121,7 @@ GPUd() uint32_t GPUTPCSliceData::GetGridSize(uint32_t nHits, uint32_t nRows)
   return 128 * nRows + 4 * nHits;
 }
 
-GPUdi() void GPUTPCSliceData::CreateGrid(GPUconstantref() const MEM_CONSTANT(GPUConstantMem) * mem, GPUTPCRow* GPUrestrict() row, float yMin, float yMax, float zMin, float zMax)
+GPUdi() void GPUTPCSliceData::CreateGrid(GPUconstantref() const GPUConstantMem* mem, GPUTPCRow* GPUrestrict() row, float yMin, float yMax, float zMin, float zMax)
 {
   float dz = zMax - zMin;
   float tfFactor = 1.f;
@@ -172,7 +172,7 @@ GPUdii() void GPUTPCSliceData::SetRowGridEmpty(GPUTPCRow& GPUrestrict() row)
   }
 }
 
-GPUdii() int32_t GPUTPCSliceData::InitFromClusterData(int32_t nBlocks, int32_t nThreads, int32_t iBlock, int32_t iThread, GPUconstantref() const MEM_CONSTANT(GPUConstantMem) * GPUrestrict() mem, int32_t iSlice, float* tmpMinMax)
+GPUdii() int32_t GPUTPCSliceData::InitFromClusterData(int32_t nBlocks, int32_t nThreads, int32_t iBlock, int32_t iThread, GPUconstantref() const GPUConstantMem* GPUrestrict() mem, int32_t iSlice, float* tmpMinMax)
 {
 #ifdef GPUCA_GPUCODE
   constexpr bool EarlyTransformWithoutClusterNative = false;
@@ -265,22 +265,20 @@ GPUdii() int32_t GPUTPCSliceData::InitFromClusterData(int32_t nBlocks, int32_t n
       for (uint32_t i = iThread; i < NumberOfClusters; i += nThreads) {
         UpdateMinMaxYZ(yMin, yMax, zMin, zMax, YZData[RowOffset + i].x, YZData[RowOffset + i].y);
       }
+    } else if (mem->param.par.earlyTpcTransform) { // Early transform case with ClusterNative present
+      for (uint32_t i = iThread; i < NumberOfClusters; i += nThreads) {
+        float2 tmp;
+        tmp.x = mClusterData[RowOffset + i].y;
+        tmp.y = mClusterData[RowOffset + i].z;
+        UpdateMinMaxYZ(yMin, yMax, zMin, zMax, tmp.x, tmp.y);
+        YZData[RowOffset + i] = tmp;
+      }
     } else {
-      if (mem->param.par.earlyTpcTransform) { // Early transform case with ClusterNative present
-        for (uint32_t i = iThread; i < NumberOfClusters; i += nThreads) {
-          float2 tmp;
-          tmp.x = mClusterData[RowOffset + i].y;
-          tmp.y = mClusterData[RowOffset + i].z;
-          UpdateMinMaxYZ(yMin, yMax, zMin, zMax, tmp.x, tmp.y);
-          YZData[RowOffset + i] = tmp;
-        }
-      } else {
-        for (uint32_t i = iThread; i < NumberOfClusters; i += nThreads) {
-          float x, y, z;
-          GPUTPCConvertImpl::convert(*mem, iSlice, rowIndex, mem->ioPtrs.clustersNative->clusters[iSlice][rowIndex][i].getPad(), mem->ioPtrs.clustersNative->clusters[iSlice][rowIndex][i].getTime(), x, y, z);
-          UpdateMinMaxYZ(yMin, yMax, zMin, zMax, y, z);
-          YZData[RowOffset + i] = CAMath::MakeFloat2(y, z);
-        }
+      for (uint32_t i = iThread; i < NumberOfClusters; i += nThreads) {
+        float x, y, z;
+        GPUTPCConvertImpl::convert(*mem, iSlice, rowIndex, mem->ioPtrs.clustersNative->clusters[iSlice][rowIndex][i].getPad(), mem->ioPtrs.clustersNative->clusters[iSlice][rowIndex][i].getTime(), x, y, z);
+        UpdateMinMaxYZ(yMin, yMax, zMin, zMax, y, z);
+        YZData[RowOffset + i] = CAMath::MakeFloat2(y, z);
       }
     }
 

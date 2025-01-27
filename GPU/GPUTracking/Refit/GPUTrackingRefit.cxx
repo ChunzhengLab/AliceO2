@@ -78,7 +78,7 @@ struct refitTrackTypes<TrackParCov> {
 } // anonymous namespace
 
 template <>
-GPUd() void GPUTrackingRefit::initProp<GPUTPCGMPropagator>(GPUTPCGMPropagator& prop)
+GPUd() void GPUTrackingRefit::initProp<GPUgeneric() GPUTPCGMPropagator>(GPUTPCGMPropagator& prop) // FIXME: GPUgeneric() needed to make the clang spirv output link correctly
 {
   prop.SetMaterialTPC();
   prop.SetMaxSinPhi(GPUCA_MAX_SIN_PHI);
@@ -91,7 +91,7 @@ GPUd() void GPUTrackingRefit::initProp<GPUTPCGMPropagator>(GPUTPCGMPropagator& p
 }
 
 template <>
-GPUd() void GPUTrackingRefit::initProp<const Propagator*>(const Propagator*& prop)
+GPUd() void GPUTrackingRefit::initProp<const Propagator * GPUgeneric()>(const Propagator*& prop) // FIXME: GPUgeneric() needed to make the clang spirv output link correctly
 {
   prop = mPpropagator;
 }
@@ -431,7 +431,7 @@ template GPUdni() int32_t GPUTrackingRefit::RefitTrack<GPUTrackingRefit::TrackPa
 #endif
 
 #ifndef GPUCA_GPUCODE
-void GPUTrackingRefit::SetPtrsFromGPUConstantMem(const GPUConstantMem* v, MEM_CONSTANT(GPUParam) * p)
+void GPUTrackingRefit::SetPtrsFromGPUConstantMem(const GPUConstantMem* v, GPUParam* p)
 {
   mPclusterState = v->ioPtrs.mergedTrackHitStates;
   mPclusterNative = v->ioPtrs.clustersNative;

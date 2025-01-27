@@ -18,6 +18,7 @@ o2_add_library(Framework
                        src/AnalysisDataModel.cxx
                        src/AnalysisSupportHelpers.cxx
                        src/ASoA.cxx
+                       src/ASoAHelpers.cxx
                        src/AsyncQueue.cxx
                        src/AnalysisDataModelHelpers.cxx
                        src/BoostOptionsRetriever.cxx
@@ -51,6 +52,7 @@ o2_add_library(Framework
                        src/ConfigParamDiscovery.cxx
                        src/ConfigParamStore.cxx
                        src/ConfigParamsHelper.cxx
+                       src/ConfigParamRegistry.cxx
                        src/ChannelParamSpec.cxx
                        src/DDSConfigHelpers.cxx
                        src/DataAllocator.cxx
@@ -137,6 +139,7 @@ o2_add_library(Framework
                        src/Task.cxx
                        src/Array2D.cxx
                        src/Variant.cxx
+                       src/VariantPropertyTreeHelpers.cxx
                        src/WorkflowCustomizationHelpers.cxx
                        src/WorkflowHelpers.cxx
                        src/WorkflowSerializationHelpers.cxx
@@ -236,6 +239,7 @@ add_executable(o2-test-framework-core
               test/test_Services.cxx
               test/test_StringHelpers.cxx
               test/test_StaticFor.cxx
+              test/test_TableSpawner.cxx
               test/test_TMessageSerializer.cxx
               test/test_TableBuilder.cxx
               test/test_TimeParallelPipelining.cxx
@@ -269,6 +273,10 @@ o2_add_test(Timers NAME test_Framework_test_Timers
             LABELS framework
             PUBLIC_LINK_LIBRARIES O2::Framework)
 
+o2_add_executable(framework-ao2d-to-ao3d
+            SOURCES test/o2AO2DToAO3D.cxx
+            PUBLIC_LINK_LIBRARIES O2::Framework)
+
 # FIXME: make this a proper test, when it actually does not hang.
 o2_add_executable(test-framework-ConsumeWhenAllOrdered
             SOURCES test/test_ConsumeWhenAllOrdered.cxx
@@ -298,6 +306,7 @@ add_executable(o2-test-framework-root
 target_link_libraries(o2-test-framework-root PRIVATE O2::Framework)
 target_link_libraries(o2-test-framework-root PRIVATE O2::Catch2)
 target_link_libraries(o2-test-framework-root PRIVATE ROOT::ROOTDataFrame)
+target_link_libraries(o2-test-framework-root PRIVATE ROOT::ROOTNTuple)
 set_property(TARGET o2-test-framework-root PROPERTY RUNTIME_OUTPUT_DIRECTORY ${outdir})
 add_test(NAME framework:root COMMAND o2-test-framework-root --skip-benchmarks)
 add_test(NAME framework:crash COMMAND  sh -e -c "PATH=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}:$PATH ${CMAKE_CURRENT_LIST_DIR}/test/test_AllCrashTypes.sh")

@@ -18,6 +18,7 @@
 #include "GPUO2DataTypes.h"
 #include "GPUMemorySizeScalers.h"
 #include "GPUTrackingInputProvider.h"
+#include "GPUNewCalibValues.h"
 #include <fstream>
 
 #ifdef GPUCA_O2_LIB
@@ -457,6 +458,7 @@ std::pair<uint32_t, uint32_t> GPUChainTracking::RunTPCClusterizer_transferZS(int
 
 int32_t GPUChainTracking::RunTPCClusterizer_prepare(bool restorePointers)
 {
+  bool doGPU = mRec->GetRecoStepsGPU() & GPUDataTypes::RecoStep::TPCClusterFinding;
   if (restorePointers) {
     for (uint32_t iSlice = 0; iSlice < NSLICES; iSlice++) {
       processors()->tpcClusterer[iSlice].mPzsOffsets = mCFContext->ptrSave[iSlice].zsOffsetHost;
@@ -512,7 +514,7 @@ int32_t GPUChainTracking::RunTPCClusterizer_prepare(bool restorePointers)
       uint32_t threshold = 40000000;
       uint32_t nDigitsScaled = nDigitsBase > threshold ? nDigitsBase : std::min((threshold + nDigitsBase) / 2, 2 * nDigitsBase);
       processors()->tpcClusterer[iSlice].SetNMaxDigits(processors()->tpcClusterer[iSlice].mPmemory->counters.nDigits, mCFContext->nPagesFragmentMax, nDigitsScaled, mCFContext->nDigitsEndpointMax[iSlice]);
-      if (mRec->IsGPU()) {
+      if (doGPU) {
         processorsShadow()->tpcClusterer[iSlice].SetNMaxDigits(processors()->tpcClusterer[iSlice].mPmemory->counters.nDigits, mCFContext->nPagesFragmentMax, nDigitsScaled, mCFContext->nDigitsEndpointMax[iSlice]);
       }
       if (mPipelineNotifyCtx && GetProcessingSettings().doublePipelineClusterizer) {
@@ -565,20 +567,20 @@ int32_t GPUChainTracking::RunTPCClusterizer_prepare(bool restorePointers)
 }
 #endif
 
-// TODO: Clusterizer not working with OCL1 (Clusterizer on CPU, Tracking on GPU)
 int32_t GPUChainTracking::RunTPCClusterizer(bool synchronizeOutput)
 {
   if (param().rec.fwdTPCDigitsAsClusters) {
     return ForwardTPCDigits();
   }
 #ifdef GPUCA_TPC_GEOMETRY_O2
+  int32_t tpcTimeBinCut = mUpdateNewCalibObjects && mNewCalibValues->newTPCTimeBinCut ? mNewCalibValues->tpcTimeBinCut : param().tpcCutTimeBin;
   mRec->PushNonPersistentMemory(qStr2Tag("TPCCLUST"));
   const auto& threadContext = GetThreadContext();
   const bool doGPU = GetRecoStepsGPU() & RecoStep::TPCClusterFinding;
   if (RunTPCClusterizer_prepare(mPipelineNotifyCtx && GetProcessingSettings().doublePipelineClusterizer)) {
     return 1;
   }
-  if (GetProcessingSettings().ompAutoNThreads && !mRec->IsGPU()) {
+  if (GetProcessingSettings().ompAutoNThreads && !doGPU) {
     mRec->SetNOMPThreads(mRec->MemoryScalers()->nTPCdigits / 20000);
   }
 
@@ -626,7 +628,7 @@ int32_t GPUChainTracking::RunTPCClusterizer(bool synchronizeOutput)
 
   auto* digitsMC = propagateMCLabels ? processors()->ioPtrs.tpcPackedDigits->tpcDigitsMC : nullptr;
 
-  bool buildNativeGPU = (mRec->GetRecoStepsGPU() & GPUDataTypes::RecoStep::TPCConversion) || (mRec->GetRecoStepsGPU() & GPUDataTypes::RecoStep::TPCSliceTracking) || (mRec->GetRecoStepsGPU() & GPUDataTypes::RecoStep::TPCMerging) || (mRec->GetRecoStepsGPU() & GPUDataTypes::RecoStep::TPCCompression);
+  bool buildNativeGPU = doGPU && NeedTPCClustersOnGPU();
   bool buildNativeHost = (mRec->GetRecoStepsOutputs() & GPUDataTypes::InOutType::TPCClusters) || GetProcessingSettings().deterministicGPUReconstruction; // TODO: Should do this also when clusters are needed for later steps on the host but not requested as output
 
   mInputsHost->mNClusterNative = mInputsShadow->mNClusterNative = mRec->MemoryScalers()->nTPCHits * tpcHitLowOccupancyScalingFactor;
@@ -764,6 +766,7 @@ int32_t GPUChainTracking::RunTPCClusterizer(bool synchronizeOutput)
                                                                                                                                                                                                                    : 0;
           uint32_t nBlocks = doGPU ? clusterer.mPmemory->counters.nPagesSubslice : GPUTrackingInOutZS::NENDPOINTS;
 
+          (void)tpcTimeBinCut; // TODO: To be used in decoding kernels
           switch (mCFContext->zsVersion) {
             default:
               GPUFatal("Data with invalid TPC ZS mode (%d) received", mCFContext->zsVersion);
@@ -865,8 +868,12 @@ int32_t GPUChainTracking::RunTPCClusterizer(bool synchronizeOutput)
         }
 
         if (fragment.index == 0) {
-          runKernel<GPUMemClean16>({GetGridAutoStep(lane, RecoStep::TPCClusterFinding), krnlRunRangeNone, {nullptr, transferRunning[lane] == 1 ? &mEvents->stream[lane] : nullptr}}, clustererShadow.mPclusterInRow, GPUCA_ROW_COUNT * sizeof(*clustererShadow.mPclusterInRow));
-          transferRunning[lane] = 2;
+          deviceEvent* waitEvent = nullptr;
+          if (transferRunning[lane] == 1) {
+            waitEvent = &mEvents->stream[lane];
+            transferRunning[lane] = 2;
+          }
+          runKernel<GPUMemClean16>({GetGridAutoStep(lane, RecoStep::TPCClusterFinding), krnlRunRangeNone, {nullptr, waitEvent}}, clustererShadow.mPclusterInRow, GPUCA_ROW_COUNT * sizeof(*clustererShadow.mPclusterInRow));
         }
 
         if (clusterer.mPmemory->counters.nClusters == 0) {
@@ -930,7 +937,7 @@ int32_t GPUChainTracking::RunTPCClusterizer(bool synchronizeOutput)
         if (transferRunning[lane]) {
           ReleaseEvent(mEvents->stream[lane], doGPU);
         }
-        RecordMarker(mEvents->stream[lane], mRec->NStreams() - 1);
+        RecordMarker(&mEvents->stream[lane], mRec->NStreams() - 1);
         transferRunning[lane] = 1;
       }
 

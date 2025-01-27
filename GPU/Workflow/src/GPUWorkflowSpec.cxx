@@ -154,9 +154,9 @@ void GPURecoWorkflowSpec::init(InitContext& ic)
   }
 
   mAutoSolenoidBz = mConfParam->solenoidBzNominalGPU == -1e6f;
-  mAutoContinuousMaxTimeBin = mConfig->configGRP.continuousMaxTimeBin == -1;
+  mAutoContinuousMaxTimeBin = mConfig->configGRP.grpContinuousMaxTimeBin < 0;
   if (mAutoContinuousMaxTimeBin) {
-    mConfig->configGRP.continuousMaxTimeBin = (256 * o2::constants::lhc::LHCMaxBunches + 2 * o2::tpc::constants::LHCBCPERTIMEBIN - 2) / o2::tpc::constants::LHCBCPERTIMEBIN;
+    mConfig->configGRP.grpContinuousMaxTimeBin = GPUO2InterfaceUtils::getTpcMaxTimeBinFromNHbf(mConfParam->overrideNHbfPerTF ? mConfParam->overrideNHbfPerTF : 256);
   }
   if (mConfig->configProcessing.deviceNum == -2) {
     int32_t myId = ic.services().get<const o2::framework::DeviceSpec>().inputTimesliceId;
@@ -583,7 +583,7 @@ void GPURecoWorkflowSpec::run(ProcessingContext& pc)
   mTFSettings->tfStartOrbit = tinfo.firstTForbit;
   mTFSettings->hasTfStartOrbit = 1;
   mTFSettings->hasNHBFPerTF = 1;
-  mTFSettings->nHBFPerTF = GRPGeomHelper::instance().getGRPECS()->getNHBFPerTF();
+  mTFSettings->nHBFPerTF = mConfParam->overrideNHbfPerTF ? mConfParam->overrideNHbfPerTF : GRPGeomHelper::instance().getGRPECS()->getNHBFPerTF();
   mTFSettings->hasRunStartOrbit = 0;
   if (mVerbosity) {
     LOG(info) << "TF firstTForbit " << mTFSettings->tfStartOrbit << " nHBF " << mTFSettings->nHBFPerTF << " runStartOrbit " << mTFSettings->runStartOrbit << " simStartOrbit " << mTFSettings->simStartOrbit;
@@ -851,7 +851,7 @@ void GPURecoWorkflowSpec::run(ProcessingContext& pc)
       }
       createEmptyOutput = !mConfParam->partialOutputForNonFatalErrors;
     } else {
-      throw std::runtime_error("tracker returned error code " + std::to_string(retVal));
+      throw std::runtime_error("GPU Reconstruction error: error code " + std::to_string(retVal));
     }
   }
 
@@ -1013,10 +1013,9 @@ void GPURecoWorkflowSpec::doCalibUpdates(o2::framework::ProcessingContext& pc, c
       LOG(info) << "Updating solenoid field " << newCalibValues.solenoidField;
     }
     if (mAutoContinuousMaxTimeBin) {
-      mConfig->configGRP.continuousMaxTimeBin = (mTFSettings->nHBFPerTF * o2::constants::lhc::LHCMaxBunches + 2 * o2::tpc::constants::LHCBCPERTIMEBIN - 2) / o2::tpc::constants::LHCBCPERTIMEBIN;
       newCalibValues.newContinuousMaxTimeBin = true;
-      newCalibValues.continuousMaxTimeBin = mConfig->configGRP.continuousMaxTimeBin;
-      LOG(info) << "Updating max time bin " << newCalibValues.continuousMaxTimeBin;
+      newCalibValues.continuousMaxTimeBin = mConfig->configGRP.grpContinuousMaxTimeBin = GPUO2InterfaceUtils::getTpcMaxTimeBinFromNHbf(mTFSettings->nHBFPerTF);
+      LOG(info) << "Updating max time bin " << newCalibValues.continuousMaxTimeBin << " (" << mTFSettings->nHBFPerTF << " orbits)";
     }
 
     if (!mPropagatorInstanceCreated) {
@@ -1049,6 +1048,11 @@ void GPURecoWorkflowSpec::doCalibUpdates(o2::framework::ProcessingContext& pc, c
   needCalibUpdate = fetchCalibsCCDBTPC(pc, newCalibObjects, oldCalibObjects) || needCalibUpdate;
   if (mSpecConfig.runITSTracking) {
     needCalibUpdate = fetchCalibsCCDBITS(pc) || needCalibUpdate;
+  }
+  if (mTPCCutAtTimeBin != mConfig->configGRP.tpcCutTimeBin) {
+    newCalibValues.newTPCTimeBinCut = true;
+    newCalibValues.tpcTimeBinCut = mConfig->configGRP.tpcCutTimeBin = mTPCCutAtTimeBin;
+    needCalibUpdate = true;
   }
   if (needCalibUpdate) {
     LOG(info) << "Updating GPUReconstruction calibration objects";
@@ -1095,8 +1099,13 @@ Inputs GPURecoWorkflowSpec::inputs()
   } else if (mSpecConfig.enableDoublePipeline == 1) {
     inputs.emplace_back("pipelineprepare", gDataOriginGPU, "PIPELINEPREPARE", 0, Lifetime::Timeframe);
   }
+  if (mSpecConfig.outputTracks || mSpecConfig.caClusterer) {
+    // calibration objects for TPC clusterization
+    inputs.emplace_back("tpcgain", gDataOriginTPC, "PADGAINFULL", 0, Lifetime::Condition, ccdbParamSpec(o2::tpc::CDBTypeMap.at(o2::tpc::CDBType::CalPadGainFull)));
+    inputs.emplace_back("tpcaltrosync", gDataOriginTPC, "ALTROSYNCSIGNAL", 0, Lifetime::Condition, ccdbParamSpec(o2::tpc::CDBTypeMap.at(o2::tpc::CDBType::AltroSyncSignal)));
+  }
   if (mSpecConfig.outputTracks) {
-    // loading calibration objects from the CCDB
+    // calibration objects for TPC tracking
     const auto mapSources = mSpecConfig.tpcDeadMapSources;
     if (mapSources != 0) {
       tpc::SourcesDeadMap sources((mapSources > -1) ? static_cast<tpc::SourcesDeadMap>(mapSources) : tpc::SourcesDeadMap::All);
@@ -1107,9 +1116,13 @@ Inputs GPURecoWorkflowSpec::inputs()
         inputs.emplace_back("tpcruninfo", gDataOriginTPC, "TPCRUNINFO", 0, Lifetime::Condition, ccdbParamSpec(o2::tpc::CDBTypeMap.at(o2::tpc::CDBType::ConfigRunInfo)));
       }
     }
-    inputs.emplace_back("tpcgain", gDataOriginTPC, "PADGAINFULL", 0, Lifetime::Condition, ccdbParamSpec(o2::tpc::CDBTypeMap.at(o2::tpc::CDBType::CalPadGainFull)));
+
     inputs.emplace_back("tpcgainresidual", gDataOriginTPC, "PADGAINRESIDUAL", 0, Lifetime::Condition, ccdbParamSpec(o2::tpc::CDBTypeMap.at(o2::tpc::CDBType::CalPadGainResidual), {}, 1)); // time-dependent
-    inputs.emplace_back("tpctimegain", gDataOriginTPC, "TIMEGAIN", 0, Lifetime::Condition, ccdbParamSpec(o2::tpc::CDBTypeMap.at(o2::tpc::CDBType::CalTimeGain), {}, 1));                   // time-dependent
+    if (mSpecConfig.tpcUseMCTimeGain) {
+      inputs.emplace_back("tpctimegain", gDataOriginTPC, "TIMEGAIN", 0, Lifetime::Condition, ccdbParamSpec(o2::tpc::CDBTypeMap.at(o2::tpc::CDBType::CalTimeGainMC), {}, 1)); // time-dependent
+    } else {
+      inputs.emplace_back("tpctimegain", gDataOriginTPC, "TIMEGAIN", 0, Lifetime::Condition, ccdbParamSpec(o2::tpc::CDBTypeMap.at(o2::tpc::CDBType::CalTimeGain), {}, 1)); // time-dependent
+    }
     inputs.emplace_back("tpctopologygain", gDataOriginTPC, "TOPOLOGYGAIN", 0, Lifetime::Condition, ccdbParamSpec(o2::tpc::CDBTypeMap.at(o2::tpc::CDBType::CalTopologyGain)));
     inputs.emplace_back("tpcthreshold", gDataOriginTPC, "PADTHRESHOLD", 0, Lifetime::Condition, ccdbParamSpec("TPC/Config/FEEPad"));
     o2::tpc::VDriftHelper::requestCCDBInputs(inputs);
@@ -1120,11 +1133,6 @@ Inputs GPURecoWorkflowSpec::inputs()
   if (mSpecConfig.decompressTPC) {
     inputs.emplace_back(InputSpec{"input", ConcreteDataTypeMatcher{gDataOriginTPC, mSpecConfig.decompressTPCFromROOT ? o2::header::DataDescription("COMPCLUSTERS") : o2::header::DataDescription("COMPCLUSTERSFLAT")}, Lifetime::Timeframe});
   } else if (mSpecConfig.caClusterer) {
-    // if the output type are tracks, then the input spec for the gain map is already defined
-    if (!mSpecConfig.outputTracks) {
-      inputs.emplace_back("tpcgain", gDataOriginTPC, "PADGAINFULL", 0, Lifetime::Condition, ccdbParamSpec(o2::tpc::CDBTypeMap.at(o2::tpc::CDBType::CalPadGainFull)));
-    }
-
     // We accept digits and MC labels also if we run on ZS Raw data, since they are needed for MC label propagation
     if ((!mSpecConfig.zsOnTheFly || mSpecConfig.processMC) && !mSpecConfig.zsDecoder) {
       inputs.emplace_back(InputSpec{"input", ConcreteDataTypeMatcher{gDataOriginTPC, "DIGITS"}, Lifetime::Timeframe});

@@ -17,6 +17,10 @@
 #include "Generators/Generator.h"
 #include "TParticle.h"
 #include <vector>
+#include <Generators/BoxGunParam.h>
+#include "SimulationDataFormat/MCEventHeader.h"
+#include "SimulationDataFormat/ParticleStatus.h"
+#include <SimulationDataFormat/MCGenProperties.h>
 
 namespace o2::eventgen
 {
@@ -43,6 +47,13 @@ class BoxGenerator : public Generator
     SetEtaRange(etamin, etamax);
     SetPRange(pmin, pmax);
     SetPhiRange(phimin, phimax);
+  }
+
+  BoxGenerator(BoxGenConfig const& config) : mPDG{config.pdg}, mMult{config.number}
+  {
+    SetEtaRange(config.eta[0], config.eta[1]);
+    SetPRange(config.prange[0], config.prange[1]);
+    SetPhiRange(config.phirange[0], config.phirange[1]);
   }
 
   void SetPRange(Double32_t pmin = 0, Double32_t pmax = 10)
@@ -81,7 +92,23 @@ class BoxGenerator : public Generator
   {
     mParticles.clear();
     std::copy(mEvent.begin(), mEvent.end(), std::back_insert_iterator(mParticles));
+    for (auto& particle : mParticles) {
+      auto statusCode = particle.GetStatusCode();
+      if (!mcgenstatus::isEncoded(statusCode)) {
+        particle.SetStatusCode(mcgenstatus::MCGenStatusEncoding(statusCode, 0).fullEncoding);
+      }
+      // Set the transport bit according to the HepMC status code
+      particle.SetBit(ParticleStatus::kToBeDone, mcgenstatus::getHepMCStatusCode(particle.GetStatusCode()) == 1);
+    }
     return true;
+  }
+
+  void updateHeader(o2::dataformats::MCEventHeader* eventHeader) override
+  {
+    using Key = o2::dataformats::MCInfoKeys;
+    if (eventHeader) {
+      eventHeader->putInfo<std::string>(Key::generator, "o2::eventgen::BoxGenerator");
+    }
   }
 
  private:

@@ -14,6 +14,9 @@
 * \subpage refrunSimExamplesAliRoot_AMPT
 * \subpage refrunSimExamplesHepMC
 * \subpage refrunSimExamplesHepMC_STARlight
+* \subpage refrunSimExamplesHepMC_EPOS4
+* \subpage refrunSimExamplesHybrid
+* \subpage refrunSimExamplesHybrid_parallel
 * \subpage refrunSimExamplesJet_Embedding_Pythia8
 * \subpage refrunSimExamplesMcTracksToAOD
 * \subpage refrunSimExamplesMcTracksToAOD

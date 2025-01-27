@@ -17,6 +17,7 @@
 #include "Generators/Generator.h"
 #include "Pythia8/Pythia.h"
 #include <functional>
+#include "Generators/GeneratorPythia8Param.h"
 
 namespace o2
 {
@@ -88,6 +89,8 @@ class GeneratorPythia8 : public Generator
  public:
   /** default constructor **/
   GeneratorPythia8();
+  /** constructor **/
+  GeneratorPythia8(Pythia8GenConfig const&);
   /** constructor **/
   GeneratorPythia8(const Char_t* name, const Char_t* title = "ALICEo2 Pythia8 Generator");
   /** destructor **/
@@ -282,6 +285,10 @@ class GeneratorPythia8 : public Generator
   long mInitialRNGSeed = -1;   // initial seed for Pythia random number state;
                                // will be transported to Pythia in the Init function through the Pythia::readString("Random:seed") mechanism.
                                // Value of -1 means unitialized; 0 will be time-dependent and values >1 <= MAX_SEED concrete reproducible seeding
+  Pythia8GenConfig mGenConfig; // configuration object
+
+  static std::atomic<int> Pythia8InstanceCounter;
+  int mThisPythia8InstanceID = 0;
 
   constexpr static long MAX_SEED = 900000000;
 

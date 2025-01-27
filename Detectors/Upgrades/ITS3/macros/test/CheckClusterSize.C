@@ -68,6 +68,7 @@ void checkFile(const std::unique_ptr<TFile>& file);
 
 inline unsigned short hist_map(unsigned short id)
 {
+<<<<<<< HEAD
 <<<<<<< Updated upstream
   if (isDetITS3) {
     return std::clamp(id, static_cast<unsigned short>(0), static_cast<unsigned short>(nLayers - 1));
@@ -78,6 +79,13 @@ inline unsigned short hist_map(unsigned short id)
   if(isDetITS3(id)) {return getDetID2Layer(id);}
   else {return nLayers - 1;}
 >>>>>>> Stashed changes
+=======
+  int lay = o2::its3::constants::detID::getDetID2Layer<int>(id);
+  if (lay == -1) {
+    return nLayers - 1;
+  }
+  return lay;
+>>>>>>> its3/matrix_gen
 }
 
 void CheckClusterSize(std::string clusFileName = "o2clus_its.root",
@@ -145,6 +153,7 @@ void CheckClusterSize(std::string clusFileName = "o2clus_its.root",
   std::vector<TH2D> hOtherSecondaryEta;
   std::vector<TH2D> hOtherSecondaryPt;
   std::vector<TH2D> hOtherSecondaryPhi;
+
   for (int i = 0; i < 4; ++i) {
     hPrimary.emplace_back(Form("primary_L%d", i), Form("L%d Primary Cluster Size", i), maxClusterSize, -0.5, maxClusterSize-0.5);
     hPrimaryEta.emplace_back(Form("primary_EtaL%d", i), Form("L%d Primary Cluster Size vs Eta", i), maxClusterSize, -0.5, maxClusterSize-0.5, 100, -3.0, 3.0);
@@ -250,14 +259,15 @@ void CheckClusterSize(std::string clusFileName = "o2clus_its.root",
   int nROFRec = (int)rofRecVec.size();
   auto pattIt = patternsPtr->cbegin();
 
+  int cInvalid{0}, cGood{0};
   for (int irof = 0; irof < nROFRec; irof++) {
     const auto& rofRec = rofRecVec[irof];
-    // rofRec.print();
+    /*rofRec.print();*/
 
     for (int icl = 0; icl < rofRec.getNEntries(); icl++) {
       int clEntry = rofRec.getFirstEntry() + icl;
       const auto& cluster = clusArr[clEntry];
-      // cluster.print();
+      /*cluster.print();*/
 
       auto pattId = cluster.getPatternID();
       auto id = cluster.getSensorID();
@@ -273,14 +283,20 @@ void CheckClusterSize(std::string clusFileName = "o2clus_its.root",
 
       const auto& label = (clusLabArr->getLabels(clEntry))[0];
       if (!label.isValid() || label.getSourceID() != 0 || !label.isCorrect()) {
+        ++cInvalid;
         continue;
       }
+      ++cGood;
 
       const int trackID = label.getTrackID();
       int evID = label.getEventID();
       const auto& pInfo = info[evID][trackID];
+<<<<<<< HEAD
 
       if (isDetITS3(id)) {
+=======
+      if (!o2::its3::constants::detID::isDetITS3(id)) {
+>>>>>>> its3/matrix_gen
         hOuterBarrel.Fill(clusterSize);
       }
 
@@ -346,6 +362,7 @@ void CheckClusterSize(std::string clusFileName = "o2clus_its.root",
       }
     }
   }
+  std::cout << "Good labels: " << cGood << "; invalid: " << cInvalid << '\n';
   std::cout << "Done measuring cluster sizes:" << std::endl;
   for (int i = 0; i < nLayers; ++i) {
     std::cout << "* Layer " << i << ":\n";

@@ -216,8 +216,9 @@ int32_t GPUReconstructionCPU::RunChains()
 
   timerTotal.Start();
   if (mProcessingSettings.doublePipeline) {
-    if (EnqueuePipeline()) {
-      return 1;
+    int32_t retVal = EnqueuePipeline();
+    if (retVal) {
+      return retVal;
     }
   } else {
     if (mThreadId != GetThread()) {
@@ -227,7 +228,7 @@ int32_t GPUReconstructionCPU::RunChains()
       mThreadId = GetThread();
     }
     if (mSlaves.size() || mMaster) {
-      WriteConstantParams(); // Reinitialize
+      WriteConstantParams(); // Reinitialize // TODO: Get this in sync with GPUChainTracking::DoQueuedUpdates, and consider the doublePipeline
     }
     for (uint32_t i = 0; i < mChains.size(); i++) {
       int32_t retVal = mChains[i]->RunChain();

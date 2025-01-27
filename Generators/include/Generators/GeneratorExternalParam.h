@@ -34,6 +34,12 @@ struct GeneratorExternalParam : public o2::conf::ConfigurableParamHelper<Generat
   O2ParamDef(GeneratorExternalParam, "GeneratorExternal");
 };
 
+struct ExternalGenConfig {
+  std::string fileName = "";
+  std::string funcName = "";
+  std::string iniFile = ""; // if ini file is given, the configuration will be taken from this and the other 2 fields neglected
+};
+
 } // end namespace eventgen
 } // end namespace o2
 

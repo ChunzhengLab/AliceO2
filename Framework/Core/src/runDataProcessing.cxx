@@ -8,6 +8,7 @@
 // In applying this license CERN does not waive the privileges and immunities
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
+#include <memory>
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 #include <stdexcept>
 #include "Framework/BoostOptionsRetriever.h"
@@ -34,6 +35,7 @@
 #include "Framework/DeviceState.h"
 #include "Framework/DeviceConfig.h"
 #include "DeviceStateHelpers.h"
+#include "Framework/ServiceRegistryHelpers.h"
 #include "Framework/DevicesManager.h"
 #include "Framework/DebugGUI.h"
 #include "Framework/LocalRootFileService.h"
@@ -68,6 +70,7 @@
 #include "HTTPParser.h"
 #include "DPLWebSocket.h"
 #include "ArrowSupport.h"
+#include "Framework/ConfigParamDiscovery.h"
 
 #include "ComputingResourceHelpers.h"
 #include "DataProcessingStatus.h"
@@ -131,9 +134,6 @@
 #include <unistd.h>
 #include <execinfo.h>
 #include <cfenv>
-// This is to allow C++20 aggregate initialisation
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
 #if defined(__linux__) && __has_include(<sched.h>)
 #include <sched.h>
 #elif __has_include(<linux/getcpu.h>)
@@ -491,6 +491,7 @@ void websocket_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
   } catch (WSError& e) {
     LOG(error) << "Error while parsing request: " << e.message;
     handler->error(e.code, e.message.c_str());
+    free(buf->base);
   }
 }
 
@@ -884,8 +885,7 @@ void processChildrenOutput(uv_loop_t* loop,
         throw runtime_error("stdout is not supported anymore as a driver backend. Please use ws://");
       } else if (logLevel == LogParsingHelpers::LogLevel::Info && DeviceConfigHelper::parseConfig(token.substr(16), configMatch)) {
         throw runtime_error("stdout is not supported anymore as a driver backend. Please use ws://");
-      } else if (!control.quiet && (token.find(control.logFilter) != std::string::npos) &&
-                 logLevel >= control.logLevel) {
+      } else if (!control.quiet && (token.find(control.logFilter) != std::string::npos) && logLevel >= info.logLevel) {
         assert(info.historyPos >= 0);
         assert(info.historyPos < info.history.size());
         info.history[info.historyPos] = token;
@@ -978,16 +978,16 @@ void doDPLException(RuntimeErrorRef& e, char const* processName)
   if (err.maxBacktrace != 0) {
     LOGP(fatal,
          "Unhandled o2::framework::runtime_error reached the top of main of {}, device shutting down."
-         " Reason: {}"
-         "\n Backtrace follow: \n",
+         " Reason: {}",
          processName, err.what);
+    LOGP(error, "Backtrace follow:");
     BacktraceHelpers::demangled_backtrace_symbols(err.backtrace, err.maxBacktrace, STDERR_FILENO);
   } else {
     LOGP(fatal,
          "Unhandled o2::framework::runtime_error reached the top of main of {}, device shutting down."
-         " Reason: {}"
-         "\n Recompile with DPL_ENABLE_BACKTRACE=1 to get more information.",
+         " Reason: {}",
          processName, err.what);
+    LOGP(error, "Recompile with DPL_ENABLE_BACKTRACE=1 to get more information.");
   }
 }
 
@@ -1445,6 +1445,9 @@ int runStateMachine(DataProcessorSpecs const& workflow,
   if (driverConfig.batch == false && window == nullptr && frameworkId.empty()) {
     LOG(warn) << "Could not create GUI. Switching to batch mode. Do you have GLFW on your system?";
     driverConfig.batch = true;
+    if (varmap["error-policy"].defaulted()) {
+      driverInfo.processingPolicies.error = TerminationPolicy::QUIT;
+    }
   }
   bool guiQuitRequested = false;
   bool hasError = false;
@@ -2123,6 +2126,37 @@ int runStateMachine(DataProcessorSpecs const& workflow,
                          driverInfo.resourcesMonitoringDumpInterval * 1000,
                          driverInfo.resourcesMonitoringDumpInterval * 1000);
         }
+        /// Set the value for the severity of displayed logs to the command line value --severity
+        for (const auto& processorInfo : dataProcessorInfos) {
+          const auto& cmdLineArgs = processorInfo.cmdLineArgs;
+          if (std::find(cmdLineArgs.begin(), cmdLineArgs.end(), "--severity") != cmdLineArgs.end()) {
+            for (size_t counter = 0; const auto& spec : runningWorkflow.devices) {
+              if (spec.name.compare(processorInfo.name) == 0) {
+                auto& info = infos[counter];
+                const auto logLevelIt = std::find(cmdLineArgs.begin(), cmdLineArgs.end(), "--severity") + 1;
+                if ((*logLevelIt).compare("debug") == 0) {
+                  info.logLevel = LogParsingHelpers::LogLevel::Debug;
+                } else if ((*logLevelIt).compare("detail") == 0) {
+                  info.logLevel = LogParsingHelpers::LogLevel::Debug;
+                } else if ((*logLevelIt).compare("info") == 0) {
+                  info.logLevel = LogParsingHelpers::LogLevel::Info;
+                } else if ((*logLevelIt).compare("warning") == 0) {
+                  info.logLevel = LogParsingHelpers::LogLevel::Warning;
+                } else if ((*logLevelIt).compare("error") == 0) {
+                  info.logLevel = LogParsingHelpers::LogLevel::Error;
+                } else if ((*logLevelIt).compare("important") == 0) {
+                  info.logLevel = LogParsingHelpers::LogLevel::Info;
+                } else if ((*logLevelIt).compare("alarm") == 0) {
+                  info.logLevel = LogParsingHelpers::LogLevel::Alarm;
+                } else if ((*logLevelIt).compare("fatal") == 0) {
+                  info.logLevel = LogParsingHelpers::LogLevel::Fatal;
+                }
+                break;
+              }
+              ++counter;
+            }
+          }
+        }
         LOG(info) << "Redeployment of configuration done.";
       } break;
       case DriverState::RUNNING:
@@ -2753,7 +2787,7 @@ void enableSignposts(std::string const& signpostsToEnable)
     }
 
     auto fullName = prefix + std::string{selectedName, last ? last - selectedName : strlen(selectedName)};
-    if (strncmp(name, fullName.data(), fullName.size()) == 0) {
+    if (fullName == name) {
       LOGP(info, "Enabling signposts for stream \"{}\" with depth {}.", fullName, maxDepth);
       _o2_log_set_stacktrace(log, maxDepth);
       return false;
@@ -2770,6 +2804,38 @@ void enableSignposts(std::string const& signpostsToEnable)
     o2_walk_logs(matchingLogEnabler, token);
     token = strtok_r(nullptr, ",", &saveptr);
   }
+}
+
+void overrideAll(o2::framework::ConfigContext& ctx, std::vector<o2::framework::DataProcessorSpec>& workflow)
+{
+  overrideCloning(ctx, workflow);
+  overridePipeline(ctx, workflow);
+  overrideLabels(ctx, workflow);
+}
+
+o2::framework::ConfigContext createConfigContext(std::unique_ptr<ConfigParamRegistry>& workflowOptionsRegistry,
+                                                 o2::framework::ServiceRegistry& configRegistry,
+                                                 std::vector<o2::framework::ConfigParamSpec>& workflowOptions,
+                                                 std::vector<o2::framework::ConfigParamSpec>& extraOptions, int argc, char** argv)
+{
+  std::vector<std::unique_ptr<o2::framework::ParamRetriever>> retrievers;
+  std::unique_ptr<o2::framework::ParamRetriever> retriever{new o2::framework::BoostOptionsRetriever(true, argc, argv)};
+  retrievers.emplace_back(std::move(retriever));
+  auto workflowOptionsStore = std::make_unique<o2::framework::ConfigParamStore>(workflowOptions, std::move(retrievers));
+  workflowOptionsStore->preload();
+  workflowOptionsStore->activate();
+  workflowOptionsRegistry = std::make_unique<ConfigParamRegistry>(std::move(workflowOptionsStore));
+  extraOptions = o2::framework::ConfigParamDiscovery::discover(*workflowOptionsRegistry, argc, argv);
+  for (auto& extra : extraOptions) {
+    workflowOptions.push_back(extra);
+  }
+
+  return o2::framework::ConfigContext(*workflowOptionsRegistry, o2::framework::ServiceRegistryRef{configRegistry}, argc, argv);
+}
+
+std::unique_ptr<o2::framework::ServiceRegistry> createRegistry()
+{
+  return std::make_unique<o2::framework::ServiceRegistry>();
 }
 
 // This is a toy executor for the workflow spec

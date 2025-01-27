@@ -54,7 +54,6 @@ void customize(std::vector<o2::framework::ConfigParamSpec>& workflowOptions)
   options.push_back(ConfigParamSpec{"ctf-input", VariantType::String, "none", {"comma-separated list CTF input files"}});
   options.push_back(ConfigParamSpec{"onlyDet", VariantType::String, std::string{DetID::ALL}, {"comma-separated list of detectors to accept. Overrides skipDet"}});
   options.push_back(ConfigParamSpec{"skipDet", VariantType::String, std::string{DetID::NONE}, {"comma-separate list of detectors to skip"}});
-  options.push_back(ConfigParamSpec{"max-tf", VariantType::Int, -1, {"max CTFs to process (<= 0 : infinite)"}});
   options.push_back(ConfigParamSpec{"loop", VariantType::Int, 0, {"loop N times (infinite for N<0)"}});
   options.push_back(ConfigParamSpec{"delay", VariantType::Float, 0.f, {"delay in seconds between consecutive TFs sending"}});
   options.push_back(ConfigParamSpec{"copy-cmd", VariantType::String, "alien_cp ?src file://?dst", {"copy command for remote files or no-copy to avoid copying"}}); // Use "XrdSecPROTOCOL=sss,unix xrdcp -N root://eosaliceo2.cern.ch/?src ?dst" for direct EOS access
@@ -67,7 +66,9 @@ void customize(std::vector<o2::framework::ConfigParamSpec>& workflowOptions)
   options.push_back(ConfigParamSpec{"ctf-data-subspec", VariantType::Int, 0, {"subspec to use for decoded CTF messages (use non-0 if CTF writer will be attached downstream)"}});
   options.push_back(ConfigParamSpec{"configKeyValues", VariantType::String, "", {"Semicolon separated key=value strings"}});
   options.push_back(ConfigParamSpec{"ir-frames-files", VariantType::String, "", {"If non empty, inject selected IRFrames from this file"}});
+  options.push_back(ConfigParamSpec{"run-time-span-file", VariantType::String, "", {"If non empty, inject selected IRFrames from this text file (run, min/max orbit or unix time)"}});
   options.push_back(ConfigParamSpec{"skip-skimmed-out-tf", VariantType::Bool, false, {"Do not process TFs with empty IR-Frame coverage"}});
+  options.push_back(ConfigParamSpec{"invert-irframe-selection", VariantType::Bool, false, {"Select only frames mentioned in ir-frames-file (skip-skimmed-out-tf applied to TF not selected!)"}});
   //
   options.push_back(ConfigParamSpec{"its-digits", VariantType::Bool, false, {"convert ITS clusters to digits"}});
   options.push_back(ConfigParamSpec{"mft-digits", VariantType::Bool, false, {"convert MFT clusters to digits"}});
@@ -116,8 +117,6 @@ WorkflowSpec defineDataProcessing(ConfigContext const& configcontext)
   if (ctfInput.delay_us < 0) {
     ctfInput.delay_us = 0;
   }
-  int n = configcontext.options().get<int>("max-tf");
-  ctfInput.maxTFs = n > 0 ? n : 0x7fffffff;
 
   ctfInput.maxFileCache = std::max(1, configcontext.options().get<int>("max-cached-files"));
 
@@ -128,13 +127,21 @@ WorkflowSpec defineDataProcessing(ConfigContext const& configcontext)
   ctfInput.sup0xccdb = !configcontext.options().get<bool>("send-diststf-0xccdb");
   ctfInput.minSHM = std::stoul(configcontext.options().get<std::string>("timeframes-shm-limit"));
   ctfInput.fileIRFrames = configcontext.options().get<std::string>("ir-frames-files");
+  ctfInput.fileRunTimeSpans = configcontext.options().get<std::string>("run-time-span-file");
   ctfInput.skipSkimmedOutTF = configcontext.options().get<bool>("skip-skimmed-out-tf");
+  ctfInput.invertIRFramesSelection = configcontext.options().get<bool>("invert-irframe-selection");
   int verbosity = configcontext.options().get<int>("ctf-reader-verbosity");
 
   int rateLimitingIPCID = std::stoi(configcontext.options().get<std::string>("timeframes-rate-limit-ipcid"));
   std::string chanFmt = configcontext.options().get<std::string>("metric-feedback-channel-format");
   if (rateLimitingIPCID > -1 && !chanFmt.empty()) {
     ctfInput.metricChannel = fmt::format(fmt::runtime(chanFmt), o2::framework::ChannelSpecHelpers::defaultIPCFolder(), rateLimitingIPCID);
+  }
+  if (!ctfInput.fileRunTimeSpans.empty()) {
+    ctfInput.skipSkimmedOutTF = true;
+  }
+  if (!ctfInput.fileIRFrames.empty() && !ctfInput.fileRunTimeSpans.empty()) {
+    LOGP(fatal, "One cannot provide --ir-frames-files and --run-time-span-file options simultaneously");
   }
 
   specs.push_back(o2::ctf::getCTFReaderSpec(ctfInput));

@@ -136,6 +136,7 @@ TH1F* TopologyDictionary::getTopologyDistribution(const std::string_view hname) 
 template <typename T>
 math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::CompClusterExt& cl) const
 {
+  static std::array<o2::its3::SegmentationSuperAlpide, 3> mSuperSegmentations{0, 1, 2};
   math_utils::Point3D<T> locCl;
   if (!its3::constants::detID::isDetITS3(cl.getSensorID())) {
     o2::itsmft::SegmentationAlpide::detectorToLocalUnchecked(cl.getRow(), cl.getCol(), locCl);
@@ -156,6 +157,7 @@ math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::C
 template <typename T>
 math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::CompClusterExt& cl, const itsmft::ClusterPattern& patt, bool isGroup)
 {
+  static std::array<o2::its3::SegmentationSuperAlpide, 3> mSuperSegmentations{0, 1, 2};
   auto refRow = cl.getRow();
   auto refCol = cl.getCol();
   float xCOG = 0, zCOG = 0;

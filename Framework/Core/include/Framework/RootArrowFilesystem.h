@@ -11,32 +11,27 @@
 #ifndef O2_FRAMEWORK_ROOT_ARROW_FILESYSTEM_H_
 #define O2_FRAMEWORK_ROOT_ARROW_FILESYSTEM_H_
 
+#include <TBufferFile.h>
 #include <arrow/dataset/type_fwd.h>
 #include <arrow/dataset/file_base.h>
 #include <arrow/filesystem/type_fwd.h>
 #include <arrow/type_fwd.h>
+#include <memory>
 
-class TTree;
+class TFile;
 class TBufferFile;
 class TDirectoryFile;
 
 namespace o2::framework
 {
 
-class TTreeFileWriteOptions : public arrow::dataset::FileWriteOptions
+// This is to avoid having to implement a bunch of unimplemented methods
+// for all the possible virtual filesystem we can invent on top of ROOT
+// data structures.
+class VirtualRootFileSystemBase : public arrow::fs::FileSystem
 {
  public:
-  TTreeFileWriteOptions(std::shared_ptr<arrow::dataset::FileFormat> format)
-    : FileWriteOptions(format)
-  {
-  }
-};
-
-// This is a virtual filesystem based on a ttree, where branches with the
-// same prefix get grouped into a fragment
-class TTreeFileSystem : public arrow::fs::FileSystem
-{
- public:
+  // Dummy implementation to avoid
   arrow::Result<arrow::fs::FileInfo> GetFileInfo(const std::string& path) override;
   arrow::Result<arrow::fs::FileInfoVector> GetFileInfo(const arrow::fs::FileSelector& select) override;
 
@@ -44,6 +39,8 @@ class TTreeFileSystem : public arrow::fs::FileSystem
   {
     return this->type_name() == other.type_name();
   }
+
+  virtual std::shared_ptr<VirtualRootFileSystemBase> GetSubFilesystem(arrow::dataset::FileSource source) = 0;
 
   arrow::Status CreateDir(const std::string& path, bool recursive) override;
 
@@ -70,45 +67,69 @@ class TTreeFileSystem : public arrow::fs::FileSystem
   arrow::Result<std::shared_ptr<arrow::io::OutputStream>> OpenAppendStream(
     const std::string& path,
     const std::shared_ptr<const arrow::KeyValueMetadata>& metadata) override;
-
-  virtual TTree* GetTree(arrow::dataset::FileSource) = 0;
 };
 
-class SingleTreeFileSystem : public TTreeFileSystem
-{
- public:
-  SingleTreeFileSystem(TTree* tree)
-    : TTreeFileSystem(),
-      mTree(tree)
-  {
-  }
-
-  std::string type_name() const override
-  {
-    return "ttree";
-  }
-
-  TTree* GetTree(arrow::dataset::FileSource) override
-  {
-    // Simply return the only TTree we have
-    return mTree;
-  }
-
- private:
-  TTree* mTree;
+struct RootArrowFactory final {
+  std::function<std::shared_ptr<arrow::dataset::FileWriteOptions>()> options = nullptr;
+  std::function<std::shared_ptr<arrow::dataset::FileFormat>()> format = nullptr;
+  std::function<std::shared_ptr<VirtualRootFileSystemBase>(void*)> getSubFilesystem = nullptr;
 };
 
-class TFileFileSystem : public TTreeFileSystem
+struct RootArrowFactoryPlugin {
+  virtual RootArrowFactory* create() = 0;
+};
+
+// A registry for all the possible ways of encoding a table in a TFile
+struct RootObjectReadingCapability {
+  // The unique name of this capability
+  std::string name = "unknown";
+  // Convert a logical filename to an actual object to be read
+  // This can be used, e.g. to read an RNTuple stored in
+  // a flat directory structure in a TFile vs a TTree stored inside
+  // a TDirectory (e.g. /DF_1000/o2tracks).
+  std::function<std::string(std::string)> lfn2objectPath;
+  // Given a TFile, return the object which this capability support
+  // Use a void * in order not to expose the kind of object to the
+  // generic reading code. This is also where we load the plugin
+  // which will be used for the actual creation.
+  std::function<void*(TDirectoryFile* file, std::string const& path)> getHandle;
+  // Same as the above, but uses a TBufferFile as storage
+  std::function<void*(TBufferFile*, std::string const&)> getBufferHandle;
+  // This must be implemented to load the actual RootArrowFactory plugin which
+  // implements this capability. This way the detection of the file format
+  // (via get handle) does not need to know about the actual code which performs
+  // the serialization (and might depend on e.g. RNTuple).
+  std::function<RootArrowFactory&()> factory;
+};
+
+struct RootObjectReadingCapabilityPlugin {
+  virtual RootObjectReadingCapability* create() = 0;
+};
+
+// This acts as registry of all the capabilities (i.e. the ability to
+// associate a given object in a root file to the serialization plugin) and
+// the factory (i.e. the serialization plugin)
+struct RootObjectReadingFactory {
+  std::vector<RootObjectReadingCapability> capabilities;
+};
+
+class TFileFileSystem : public VirtualRootFileSystemBase
 {
  public:
-  TFileFileSystem(TDirectoryFile* f, size_t readahead);
+  arrow::Result<arrow::fs::FileInfo> GetFileInfo(const std::string& path) override;
+
+  TFileFileSystem(TDirectoryFile* f, size_t readahead, RootObjectReadingFactory&);
 
   std::string type_name() const override
   {
     return "TDirectoryFile";
   }
 
-  TTree* GetTree(arrow::dataset::FileSource source) override;
+  std::shared_ptr<VirtualRootFileSystemBase> GetSubFilesystem(arrow::dataset::FileSource source) override;
+
+  arrow::Result<std::shared_ptr<arrow::io::OutputStream>> OpenOutputStream(
+    const std::string& path,
+    const std::shared_ptr<const arrow::KeyValueMetadata>& metadata) override;
 
   // We can go back to the TFile in case this is needed.
   TDirectoryFile* GetFile()
@@ -118,84 +139,52 @@ class TFileFileSystem : public TTreeFileSystem
 
  private:
   TDirectoryFile* mFile;
+  RootObjectReadingFactory& mObjectFactory;
 };
 
-class TBufferFileFS : public TTreeFileSystem
+class TBufferFileFS : public VirtualRootFileSystemBase
 {
  public:
-  TBufferFileFS(TBufferFile* f);
+  TBufferFileFS(TBufferFile* f, RootObjectReadingFactory&);
 
+  arrow::Result<arrow::fs::FileInfo> GetFileInfo(const std::string& path) override;
   std::string type_name() const override
   {
     return "tbufferfile";
   }
 
-  TTree* GetTree(arrow::dataset::FileSource) override
+  std::shared_ptr<VirtualRootFileSystemBase> GetSubFilesystem(arrow::dataset::FileSource source) override;
+
+ private:
+  TBufferFile* mBuffer;
+  std::shared_ptr<VirtualRootFileSystemBase> mFilesystem;
+  RootObjectReadingFactory& mObjectFactory;
+};
+
+// An arrow outputstream which allows to write to a TDirectoryFile.
+// This will point to the location of the file itself. You can
+// specify the location of the actual object inside it by passing the
+// associated path to the Write() API.
+class TDirectoryFileOutputStream : public arrow::io::OutputStream
+{
+ public:
+  TDirectoryFileOutputStream(TDirectoryFile*);
+
+  arrow::Status Close() override;
+
+  arrow::Result<int64_t> Tell() const override;
+
+  arrow::Status Write(const void* data, int64_t nbytes) override;
+
+  bool closed() const override;
+
+  TDirectoryFile* GetDirectory()
   {
-    // Simply return the only TTree we have
-    return mTree;
+    return mDirectory;
   }
 
  private:
-  TTree* mTree;
-};
-
-class TTreeFileFragment : public arrow::dataset::FileFragment
-{
- public:
-  TTreeFileFragment(arrow::dataset::FileSource source,
-                    std::shared_ptr<arrow::dataset::FileFormat> format,
-                    arrow::compute::Expression partition_expression,
-                    std::shared_ptr<arrow::Schema> physical_schema)
-    : FileFragment(std::move(source), std::move(format), std::move(partition_expression), std::move(physical_schema))
-  {
-  }
-};
-
-class TTreeFileFormat : public arrow::dataset::FileFormat
-{
-  size_t& mTotCompressedSize;
-  size_t& mTotUncompressedSize;
-
- public:
-  TTreeFileFormat(size_t& totalCompressedSize, size_t& totalUncompressedSize)
-    : FileFormat({}),
-      mTotCompressedSize(totalCompressedSize),
-      mTotUncompressedSize(totalUncompressedSize)
-  {
-  }
-
-  ~TTreeFileFormat() override = default;
-
-  std::string type_name() const override
-  {
-    return "ttree";
-  }
-
-  bool Equals(const FileFormat& other) const override
-  {
-    return other.type_name() == this->type_name();
-  }
-
-  arrow::Result<bool> IsSupported(const arrow::dataset::FileSource& source) const override
-  {
-    auto fs = std::dynamic_pointer_cast<TTreeFileSystem>(source.filesystem());
-    return fs != nullptr;
-  }
-
-  arrow::Result<std::shared_ptr<arrow::Schema>> Inspect(const arrow::dataset::FileSource& source) const override;
-  /// \brief Create a FileFragment for a FileSource.
-  arrow::Result<std::shared_ptr<arrow::dataset::FileFragment>> MakeFragment(
-    arrow::dataset::FileSource source, arrow::compute::Expression partition_expression,
-    std::shared_ptr<arrow::Schema> physical_schema) override;
-
-  arrow::Result<std::shared_ptr<arrow::dataset::FileWriter>> MakeWriter(std::shared_ptr<arrow::io::OutputStream> destination, std::shared_ptr<arrow::Schema> schema, std::shared_ptr<arrow::dataset::FileWriteOptions> options, arrow::fs::FileLocator destination_locator) const override;
-
-  std::shared_ptr<arrow::dataset::FileWriteOptions> DefaultWriteOptions() override;
-
-  arrow::Result<arrow::RecordBatchGenerator> ScanBatchesAsync(
-    const std::shared_ptr<arrow::dataset::ScanOptions>& options,
-    const std::shared_ptr<arrow::dataset::FileFragment>& fragment) const override;
+  TDirectoryFile* mDirectory;
 };
 
 } // namespace o2::framework

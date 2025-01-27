@@ -64,7 +64,7 @@ void CheckDigitsDensity(int nEvents = 10000, std::string digitFileName = "it3dig
 {
   gROOT->SetBatch(batch);
   LOGP(debug, "Checking Digit ITS3 Density");
-  // Vars
+  std::array<SSAlpide, 3> mSuperSegmentations{0, 1, 2};
 
   // Geometry
   o2::base::GeometryManager::loadGeometry(geomFileName);

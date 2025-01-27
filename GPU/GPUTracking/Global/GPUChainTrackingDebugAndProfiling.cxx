@@ -301,8 +301,9 @@ void GPUChainTracking::SanityCheck()
 
 void GPUChainTracking::RunTPCClusterFilter(o2::tpc::ClusterNativeAccess* clusters, std::function<o2::tpc::ClusterNative*(size_t)> allocator, bool applyClusterCuts)
 {
+#ifdef GPUCA_HAVE_O2HEADERS
   GPUTPCClusterFilter clusterFilter(*clusters);
-  o2::tpc::ClusterNative* outputBuffer;
+  o2::tpc::ClusterNative* outputBuffer = nullptr;
   for (int32_t iPhase = 0; iPhase < 2; iPhase++) {
     uint32_t countTotal = 0;
     for (uint32_t iSector = 0; iSector < GPUCA_NSLICES; iSector++) {
@@ -314,6 +315,9 @@ void GPUChainTracking::RunTPCClusterFilter(o2::tpc::ClusterNativeAccess* cluster
           if (applyClusterCuts) {
             keep = keep && cl.qTot > param().rec.tpc.cfQTotCutoff && cl.qMax > param().rec.tpc.cfQMaxCutoff;
             keep = keep && (!(cl.getFlags() & o2::tpc::ClusterNative::flagSingle) || ((cl.sigmaPadPacked || cl.qMax > param().rec.tpc.cfQMaxCutoffSinglePad) && (cl.sigmaTimePacked || cl.qMax > param().rec.tpc.cfQMaxCutoffSingleTime)));
+          }
+          if (param().tpcCutTimeBin > 0) {
+            keep = keep && cl.getTime() < param().tpcCutTimeBin;
           }
           keep = keep && (!GetProcessingSettings().tpcApplyDebugClusterFilter || clusterFilter.filter(iSector, iRow, cl));
           if (iPhase && keep) {
@@ -334,4 +338,5 @@ void GPUChainTracking::RunTPCClusterFilter(o2::tpc::ClusterNativeAccess* cluster
       outputBuffer = allocator(countTotal);
     }
   }
+#endif
 }

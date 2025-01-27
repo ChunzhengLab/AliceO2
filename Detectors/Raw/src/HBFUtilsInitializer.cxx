@@ -58,13 +58,15 @@ HBFUtilsInitializer::HBFUtilsInitializer(const o2f::ConfigContext& configcontext
       bool helpasked = configcontext.helpOnCommandLine(); // if help is asked, don't take for granted that the ini file is there, don't produce an error if it is not!
       auto conf = configcontext.options().isSet(HBFConfOpt) ? configcontext.options().get<std::string>(HBFConfOpt) : "";
       if (!conf.empty()) {
+        int nopts = 0;
         auto vopts = o2::utils::Str::tokenize(conf, ',');
         for (const auto& optStr : vopts) {
           if (optStr == UpstreamOpt) {
             upstream = true;
             continue;
           }
-          HBFOpt opt = getOptType(optStr);
+          HBFOpt opt = getOptType(optStr, !helpasked); // do not throw on unknown opt if help-opt was given
+          nopts++;
           if ((opt == HBFOpt::INI || opt == HBFOpt::JSON) && !helpasked) {
             o2::conf::ConfigurableParam::updateFromFile(optStr, "HBFUtils", true); // update only those values which were not touched yet (provenance == kCODE)
             const auto& hbfu = o2::raw::HBFUtils::Instance();
@@ -77,6 +79,9 @@ HBFUtilsInitializer::HBFUtilsInitializer(const o2f::ConfigContext& configcontext
           } else if (opt == HBFOpt::ROOT) {
             rootFileInput = optStr;
           }
+        }
+        if (!nopts && !helpasked) {
+          LOGP(fatal, "No source was provided for timing input of --hbfutils-config");
         }
       }
       done = true;
@@ -118,7 +123,7 @@ HBFUtilsInitializer::HBFUtilsInitializer(const o2f::ConfigContext& configcontext
 }
 
 //_________________________________________________________
-HBFUtilsInitializer::HBFOpt HBFUtilsInitializer::getOptType(const std::string& optString)
+HBFUtilsInitializer::HBFOpt HBFUtilsInitializer::getOptType(const std::string& optString, bool throwOnFailure)
 {
   // return type of the file provided via HBFConfOpt
   HBFOpt opt = HBFOpt::NONE;
@@ -131,7 +136,7 @@ HBFUtilsInitializer::HBFOpt HBFUtilsInitializer::getOptType(const std::string& o
       opt = HBFOpt::ROOT;
     } else if (optString == HBFUSrc) {
       opt = HBFOpt::HBFUTILS;
-    } else if (optString != "none") {
+    } else if (optString != "none" && throwOnFailure) {
       throw std::runtime_error(fmt::format("invalid option {} for {}", optString, HBFConfOpt));
     }
   }

@@ -293,7 +293,7 @@ class GPUChainTracking : public GPUChain, GPUReconstructionHelpers::helperDelega
 
   // Synchronization and Locks
   eventStruct* mEvents = nullptr;
-  VOLATILE int32_t mSliceSelectorReady = 0;
+  volatile int32_t mSliceSelectorReady = 0;
   std::array<int8_t, NSLICES> mWriteOutputDone;
 
   std::vector<outputQueueEntry> mOutputQueue;
@@ -313,6 +313,7 @@ class GPUChainTracking : public GPUChain, GPUReconstructionHelpers::helperDelega
   void RunTPCTrackingMerger_MergeBorderTracks(int8_t withinSlice, int8_t mergeMode, GPUReconstruction::krnlDeviceType deviceType);
   void RunTPCTrackingMerger_Resolve(int8_t useOrigTrackParam, int8_t mergeAll, GPUReconstruction::krnlDeviceType deviceType);
   void RunTPCClusterFilter(o2::tpc::ClusterNativeAccess* clusters, std::function<o2::tpc::ClusterNative*(size_t)> allocator, bool applyClusterCuts);
+  bool NeedTPCClustersOnGPU();
 
   std::atomic_flag mLockAtomicOutputBuffer = ATOMIC_FLAG_INIT;
   std::mutex mMutexUpdateCalib;

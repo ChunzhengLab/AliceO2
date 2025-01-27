@@ -82,6 +82,7 @@ void CreateDictionariesITS3(bool saveDeltas = false,
   std::vector<HitVec*> hitVecPool;
   std::vector<MC2HITS_map> mc2hitVec;
   o2::its3::TopologyDictionary clusDictOld;
+  std::array<o2::its3::SegmentationSuperAlpide, 3> mSuperSegmentations{0, 1, 2};
   if (!clusDictFile.empty()) {
     clusDictOld.readFromFile(clusDictFile);
     LOGP(info, "Loaded external cluster dictionary with {} entries from {}", clusDictOld.getSize(), clusDictFile);

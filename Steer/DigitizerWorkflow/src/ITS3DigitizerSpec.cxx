@@ -199,8 +199,6 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
     timer.Stop();
     LOG(info) << "Digitization took " << timer.CpuTime() << "s";
 
-    // mDigitizer.saveAndClose();
-
     // we should be only called once; tell DPL that this process is ready to exit
     pc.services().get<ControlService>().readyToQuit(QuitRequest::Me);
 
@@ -294,7 +292,7 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
   o2::parameters::GRPObject::ROMode mROMode = o2::parameters::GRPObject::PRESENT; // readout mode
 };
 
-DataProcessorSpec getITS3DigitizerSpec(int channel, bool mctruth)//
+DataProcessorSpec getITS3DigitizerSpec(int channel, bool mctruth)
 {
   std::string detStr = o2::detectors::DetID::getName(o2::detectors::DetID::IT3);
   auto detOrig = o2::header::gDataOriginIT3;

@@ -54,12 +54,12 @@ class SegmentationMosaix
   // |           |          |
   // x----------------------x
  public:
-  virtual ~SegmentationMosaix() = default;
-  SegmentationMosaix(const SegmentationMosaix&) = default;
-  SegmentationMosaix(SegmentationMosaix&&) = delete;
-  SegmentationMosaix& operator=(const SegmentationMosaix&) = delete;
-  SegmentationMosaix& operator=(SegmentationMosaix&&) = delete;
-  constexpr SegmentationMosaix(int layer) : mLayer{layer} {}
+  ~SegmentationSuperAlpide() = default;
+  SegmentationSuperAlpide(const SegmentationSuperAlpide&) = default;
+  SegmentationSuperAlpide(SegmentationSuperAlpide&&) = delete;
+  SegmentationSuperAlpide& operator=(const SegmentationSuperAlpide&) = default;
+  SegmentationSuperAlpide& operator=(SegmentationSuperAlpide&&) = delete;
+  constexpr SegmentationSuperAlpide(int layer) : mLayer{layer} {}
 
   static constexpr int mNCols{constants::pixelarray::nCols};
   static constexpr int mNRows{constants::pixelarray::nRows};
@@ -70,6 +70,7 @@ class SegmentationMosaix
   static constexpr float mPitchRow{constants::pixelarray::width / static_cast<float>(mNRows)};
   static constexpr float mSensorLayerThickness{constants::thickness};
   static constexpr float mSensorLayerThicknessEff{constants::effThickness};
+  static constexpr float mSensorLayerThicknessCorr{constants::corrThickness};
   static constexpr std::array<float, constants::nLayers> mRadii{constants::radii};
 
   /// Transformation from the curved surface to a flat surface
@@ -85,9 +86,8 @@ class SegmentationMosaix
   {
     // MUST align the flat surface with the curved surface with the original pixel array is on
     float dist = std::hypot(xCurved, yCurved);
-    float phiReadout = constants::tile::readout::width / constants::radii[mLayer];
     float phi = std::atan2(yCurved, xCurved);
-    xFlat = mRadii[mLayer] * (phi - phiReadout) - constants::pixelarray::width / 2.;
+    xFlat = (mRadii[mLayer] * phi) - constants::pixelarray::width / 2.;
     yFlat = dist - mRadii[mLayer];
   }
 
@@ -105,9 +105,8 @@ class SegmentationMosaix
   {
     // MUST align the flat surface with the curved surface with the original pixel array is on
     float dist = yFlat + mRadii[mLayer];
-    float phiReadout = constants::tile::readout::width / mRadii[mLayer];
-    xCurved = dist * std::cos(phiReadout + (xFlat + constants::pixelarray::width / 2.) / mRadii[mLayer]);
-    yCurved = dist * std::sin(phiReadout + (xFlat + constants::pixelarray::width / 2.) / mRadii[mLayer]);
+    xCurved = dist * std::cos((xFlat + constants::pixelarray::width / 2.) / mRadii[mLayer]);
+    yCurved = dist * std::sin((xFlat + constants::pixelarray::width / 2.) / mRadii[mLayer]);
   }
 
   /// Transformation from Geant detector centered local coordinates (cm) to
@@ -196,13 +195,9 @@ class SegmentationMosaix
     }
   }
 
-  const int mLayer{0}; ///< chip layer
-
-  ClassDef(SegmentationMosaix, 1);
+  int mLayer{0}; ///< chip layer
 };
 
-/// Segmentation array
-extern const std::array<SegmentationMosaix, constants::nLayers> SegmentationsIB;
 } // namespace o2::its3
 
 #endif

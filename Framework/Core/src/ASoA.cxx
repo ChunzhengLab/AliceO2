@@ -30,6 +30,16 @@ void missingFilterDeclaration(int hash, int ai)
   throw o2::framework::runtime_error_f("Null selection for %d (arg %d), missing Filter declaration?", hash, ai);
 }
 
+void getterNotFound(const char* targetColumnLabel)
+{
+  throw o2::framework::runtime_error_f("Getter for \"%s\" not found", targetColumnLabel);
+}
+
+void emptyColumnLabel()
+{
+  throw framework::runtime_error("columnLabel: must not be empty");
+}
+
 SelectionVector selectionToVector(gandiva::Selection const& sel)
 {
   SelectionVector rows;
@@ -115,11 +125,14 @@ std::shared_ptr<arrow::Table> ArrowHelpers::concatTables(std::vector<std::shared
 
 arrow::ChunkedArray* getIndexFromLabel(arrow::Table* table, const char* label)
 {
-  auto index = table->schema()->GetAllFieldIndices(label);
-  if (index.empty()) {
+  auto field = std::find_if(table->schema()->fields().begin(), table->schema()->fields().end(), [&](std::shared_ptr<arrow::Field> const& f) {
+    return o2::framework::strToUpper(label) == o2::framework::strToUpper(std::string{f->name()});
+  });
+  if (field == table->schema()->fields().end()) {
     o2::framework::throw_error(o2::framework::runtime_error_f("Unable to find column with label %s", label));
   }
-  return table->column(index[0]).get();
+  auto index = std::distance(table->schema()->fields().begin(), field);
+  return table->column(index).get();
 }
 
 void notBoundTable(const char* tableName)
@@ -150,35 +163,9 @@ std::string cutString(std::string&& str)
   return str;
 }
 
-void sliceByColumnGeneric(
-  char const* key,
-  char const* target,
-  std::shared_ptr<arrow::Table> const& input,
-  int32_t fullSize,
-  ListVector* groups,
-  ListVector* unassigned)
+std::string strToUpper(std::string&& str)
 {
-  groups->resize(fullSize);
-  auto column = input->GetColumnByName(key);
-  int32_t row = 0;
-  for (auto iChunk = 0; iChunk < column->num_chunks(); ++iChunk) {
-    auto chunk = static_cast<arrow::NumericArray<arrow::Int32Type>>(column->chunk(iChunk)->data());
-    for (auto iElement = 0; iElement < chunk.length(); ++iElement) {
-      auto v = chunk.Value(iElement);
-      if (v >= 0) {
-        if (v >= groups->size()) {
-          throw runtime_error_f("Table %s has an entry with index (%d) that is larger than the grouping table size (%d)", target, v, fullSize);
-        }
-        (*groups)[v].push_back(row);
-      } else if (unassigned != nullptr) {
-        auto av = std::abs(v);
-        if (unassigned->size() < av + 1) {
-          unassigned->resize(av + 1);
-        }
-        (*unassigned)[av].push_back(row);
-      }
-      ++row;
-    }
-  }
+  std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) { return std::toupper(c); });
+  return str;
 }
 } // namespace o2::framework

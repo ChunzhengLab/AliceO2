@@ -120,18 +120,20 @@ void GPUParam::SetDefaults(float solenoidBz)
   par.toyMCEventsFlag = false;
   par.continuousTracking = false;
   continuousMaxTimeBin = 0;
+  tpcCutTimeBin = 0;
   par.debugLevel = 0;
   par.earlyTpcTransform = false;
 }
 
-void GPUParam::UpdateSettings(const GPUSettingsGRP* g, const GPUSettingsProcessing* p, const GPURecoStepConfiguration* w)
+void GPUParam::UpdateSettings(const GPUSettingsGRP* g, const GPUSettingsProcessing* p, const GPURecoStepConfiguration* w, const GPUSettingsRecDynamic* d)
 {
   if (g) {
     UpdateBzOnly(g->solenoidBzNominalGPU);
     par.assumeConstantBz = g->constBz;
     par.toyMCEventsFlag = g->homemadeEvents;
-    par.continuousTracking = g->continuousMaxTimeBin != 0;
-    continuousMaxTimeBin = g->continuousMaxTimeBin == -1 ? GPUSettings::TPC_MAX_TF_TIME_BIN : g->continuousMaxTimeBin;
+    par.continuousTracking = g->grpContinuousMaxTimeBin != 0;
+    continuousMaxTimeBin = g->grpContinuousMaxTimeBin == -1 ? GPUSettings::TPC_MAX_TF_TIME_BIN : g->grpContinuousMaxTimeBin;
+    tpcCutTimeBin = g->tpcCutTimeBin;
   }
   par.earlyTpcTransform = rec.tpc.forceEarlyTransform == -1 ? (!par.continuousTracking) : rec.tpc.forceEarlyTransform;
   qptB5Scaler = CAMath::Abs(bzkG) > 0.1f ? CAMath::Abs(bzkG) / 5.006680f : 1.f; // Repeat here, since passing in g is optional
@@ -144,6 +146,9 @@ void GPUParam::UpdateSettings(const GPUSettingsGRP* g, const GPUSettingsProcessi
     if (par.dodEdx && p && p->tpcDownscaledEdx != 0) {
       dodEdxDownscaled = (rand() % 100) < p->tpcDownscaledEdx;
     }
+  }
+  if (d) {
+    rec.dyn = *d;
   }
 }
 
@@ -224,9 +229,7 @@ void GPUParam::LoadClusterErrors(bool Print)
   if (Print) {
     typedef std::numeric_limits<float> flt;
     std::cout << std::scientific;
-#if __cplusplus >= 201103L
     std::cout << std::setprecision(flt::max_digits10 + 2);
-#endif
     std::cout << "ParamS0Par[2][3][7]=" << std::endl;
     std::cout << " { " << std::endl;
     for (int32_t i = 0; i < 2; i++) {

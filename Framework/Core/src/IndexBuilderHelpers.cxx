@@ -9,6 +9,7 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
+#include "Framework/RuntimeError.h"
 #include "Framework/IndexBuilderHelpers.h"
 #include "Framework/CompilerBuiltins.h"
 #include <arrow/compute/api_aggregate.h>
@@ -19,6 +20,11 @@
 
 namespace o2::framework
 {
+void cannotBuildAnArray()
+{
+  throw runtime_error("Cannot build an array");
+}
+
 ChunkedArrayIterator::ChunkedArrayIterator(std::shared_ptr<arrow::ChunkedArray> source)
   : mSource{source}
 {
@@ -43,8 +49,8 @@ std::shared_ptr<arrow::Field> SelfIndexColumnBuilder::field() const
 }
 
 IndexColumnBuilder::IndexColumnBuilder(std::shared_ptr<arrow::ChunkedArray> source, const char* name, int listSize, arrow::MemoryPool* pool)
-  : ChunkedArrayIterator{source},
-    SelfIndexColumnBuilder{name, pool},
+  : SelfIndexColumnBuilder{name, pool},
+    ChunkedArrayIterator{source},
     mListSize{listSize},
     mSourceSize{(size_t)source->length()}
 {

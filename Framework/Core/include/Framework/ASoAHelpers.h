@@ -14,7 +14,6 @@
 
 #include "Framework/ASoA.h"
 #include "Framework/BinningPolicy.h"
-#include "Framework/RuntimeError.h"
 #include <arrow/table.h>
 
 #include <iterator>
@@ -72,6 +71,8 @@ inline bool diffCategory(BinningIndex const& a, BinningIndex const& b)
   return a.bin >= b.bin;
 }
 
+void dataSizeVariesBetweenColumns();
+
 template <template <typename... Cs> typename BP, typename T, typename... Cs>
 std::vector<BinningIndex> groupTable(const T& table, const BP<Cs...>& binningPolicy, int minCatSize, int outsider)
 {
@@ -88,7 +89,7 @@ std::vector<BinningIndex> groupTable(const T& table, const BP<Cs...>& binningPol
     return groupedIndices;
   }
 
-  if constexpr (soa::is_soa_filtered_v<T>) {
+  if constexpr (soa::is_filtered_table<T>) {
     selectedRows = table.getSelectedRows(); // vector<int64_t>
   }
 
@@ -98,7 +99,7 @@ std::vector<BinningIndex> groupTable(const T& table, const BP<Cs...>& binningPol
   auto chunksCount = arrowColumns[0]->num_chunks();
   for (int i = 1; i < persistentColumnsCount; i++) {
     if (arrowColumns[i]->num_chunks() != chunksCount) {
-      throw o2::framework::runtime_error("Combinations: data size varies between selected columns");
+      dataSizeVariesBetweenColumns();
     }
   }
 
@@ -107,11 +108,11 @@ std::vector<BinningIndex> groupTable(const T& table, const BP<Cs...>& binningPol
     auto chunkLength = std::get<0>(chunks)->length();
     for_<persistentColumnsCount - 1>([&chunks, &chunkLength](auto i) {
       if (std::get<i.value + 1>(chunks)->length() != chunkLength) {
-        throw o2::framework::runtime_error("Combinations: data size varies between selected columns");
+        dataSizeVariesBetweenColumns();
       }
     });
 
-    if constexpr (soa::is_soa_filtered_v<T>) {
+    if constexpr (soa::is_filtered_table<T>) {
       if (selectedRows[ind] >= selInd + chunkLength) {
         selInd += chunkLength;
         continue; // Go to the next chunk, no value selected in this chunk
@@ -120,7 +121,7 @@ std::vector<BinningIndex> groupTable(const T& table, const BP<Cs...>& binningPol
 
     uint64_t ai = 0;
     while (ai < chunkLength) {
-      if constexpr (soa::is_soa_filtered_v<T>) {
+      if constexpr (soa::is_filtered_table<T>) {
         ai += selectedRows[ind] - selInd;
         selInd = selectedRows[ind];
       }
@@ -132,7 +133,7 @@ std::vector<BinningIndex> groupTable(const T& table, const BP<Cs...>& binningPol
       }
       ind++;
 
-      if constexpr (soa::is_soa_filtered_v<T>) {
+      if constexpr (soa::is_filtered_table<T>) {
         if (ind >= selectedRows.size()) {
           break;
         }
@@ -141,7 +142,7 @@ std::vector<BinningIndex> groupTable(const T& table, const BP<Cs...>& binningPol
       }
     }
 
-    if constexpr (soa::is_soa_filtered_v<T>) {
+    if constexpr (soa::is_filtered_table<T>) {
       if (ind == selectedRows.size()) {
         break;
       }
@@ -1294,7 +1295,7 @@ struct CombinationsGenerator {
 template <typename T2, typename... T2s>
 constexpr bool isSameType()
 {
-  return std::conjunction_v<std::is_same<T2, T2s>...>;
+  return (std::same_as<T2, T2s> && ...);
 }
 
 template <typename BP, typename T1, typename... T2s>
@@ -1348,7 +1349,7 @@ auto combinations(const BP& binningPolicy, int categoryNeighbours, const T1& out
   }
 }
 
-template <typename... T2s>
+template <soa::is_table... T2s>
 auto combinations(const o2::framework::expressions::Filter& filter, const T2s&... tables)
 {
   if constexpr (isSameType<T2s...>()) {
@@ -1366,7 +1367,7 @@ CombinationsGenerator<P2<T2s...>> combinations(const P2<T2s...>& policy)
   return CombinationsGenerator<P2<T2s...>>(policy);
 }
 
-template <template <typename...> typename P2, typename... T2s>
+template <template <typename...> typename P2, soa::is_table... T2s>
 CombinationsGenerator<P2<Filtered<T2s>...>> combinations(P2<T2s...>&&, const o2::framework::expressions::Filter& filter, const T2s&... tables)
 {
   return CombinationsGenerator<P2<Filtered<T2s>...>>(P2<Filtered<T2s>...>(tables.select(filter)...));

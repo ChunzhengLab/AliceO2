@@ -51,6 +51,7 @@ void CheckDigitsITS3(std::string digifile = "it3digits.root", std::string hitfil
   using o2::itsmft::Hit;
 
   using o2::itsmft::SegmentationAlpide;
+  std::array<its3::SegmentationSuperAlpide, 3> mSuperSegmentations{0, 1, 2};
 
   TFile* f = TFile::Open("CheckDigits.root", "recreate");
   TNtuple* nt = new TNtuple("ntd", "digit ntuple", "id:x:y:z:rowD:colD:rowH:colH:xlH:zlH:xlcH:zlcH:dx:dz");
@@ -223,7 +224,7 @@ void CheckDigitsITS3(std::string digifile = "it3digits.root", std::string hitfil
 
       (isIB) ? ++nDigitFilledIB : ++nDigitFilledOB;
     } // end loop on digits array
-  }   // end loop on ROFRecords array
+  } // end loop on ROFRecords array
 
   auto canvXY = new TCanvas("canvXY", "", 1600, 1600);
   canvXY->Divide(2, 2);

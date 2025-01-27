@@ -19,12 +19,12 @@
 
 #include "FlatObject.h"
 #include "Spline.h"
+#include "GPUCommonRtypes.h"
 #ifdef GPUCA_HAVE_O2HEADERS
 #include "DataFormatsTPC/Defs.h"
 #endif
 
 #if !defined(GPUCA_GPUCODE) && !defined(GPUCA_STANDALONE) // code invisible on GPU and in the standalone compilation
-#include "Rtypes.h"                                       // for ClassDefNV
 #include <fmt/format.h>
 #endif
 
@@ -76,7 +76,7 @@ class CalibdEdxTrackTopologySpline : public o2::gpu::FlatObject
 
 #if !defined(GPUCA_GPUCODE)
   /// Default constructor
-  CalibdEdxTrackTopologySpline() CON_DEFAULT;
+  CalibdEdxTrackTopologySpline() = default;
 
   /// constructor with initialization of the splines from file
   /// \param dEdxSplinesFile path to root file containing the splines
@@ -92,13 +92,13 @@ class CalibdEdxTrackTopologySpline : public o2::gpu::FlatObject
 #else
   /// Disable constructors for the GPU implementation
 
-  CalibdEdxTrackTopologySpline() CON_DELETE;
-  CalibdEdxTrackTopologySpline(const CalibdEdxTrackTopologySpline&) CON_DELETE;
-  CalibdEdxTrackTopologySpline& operator=(const CalibdEdxTrackTopologySpline&) CON_DELETE;
+  CalibdEdxTrackTopologySpline() = delete;
+  CalibdEdxTrackTopologySpline(const CalibdEdxTrackTopologySpline&) = delete;
+  CalibdEdxTrackTopologySpline& operator=(const CalibdEdxTrackTopologySpline&) = delete;
 #endif
 
   /// Destructor
-  ~CalibdEdxTrackTopologySpline() CON_DEFAULT;
+  ~CalibdEdxTrackTopologySpline() = default;
 
   /// _____________  FlatObject functionality, see FlatObject class for description  ____________
 

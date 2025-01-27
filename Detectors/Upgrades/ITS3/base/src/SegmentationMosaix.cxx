@@ -10,6 +10,7 @@
 // or submit itself to any jurisdiction.
 
 #include "ITS3Base/SegmentationMosaix.h"
+#include "EventVisualisationBase/EveConfParam.h"
 
 ClassImp(o2::its3::SegmentationMosaix);
 
@@ -18,3 +19,5 @@ namespace o2::its3
 
 const std::array<SegmentationMosaix, constants::nLayers> SegmentationsIB{0, 1, 2};
 }
+
+O2ParamImpl(o2::event_visualisation::EveConfParam);

@@ -68,6 +68,7 @@ struct ChipStat {
     FlushedIncomplete,                // ALPIDE MEB was flushed by the busy handling
     StrobeExtended,                   // ALPIDE received a second trigger while the strobe was still open
     WrongAlpideChipID,                // Impossible for given cable ALPIDE ChipOnModule ID
+    DecreasingRow,                    // Decreasing row in the same column
     NErrorsDefined
   };
 
@@ -106,6 +107,7 @@ struct ChipStat {
     "FlushedIncomplete",                            // ALPIDE MEB was flushed by the busy handling
     "StrobeExtended",                               // ALPIDE received a second trigger while the strobe was still open
     "Wrong Alpide ChipID",                          // Impossible for given cable ALPIDE ChipOnModule ID
+    "Decreasing row",                               // Decreasing row in the same column
   };
 
   static constexpr std::array<uint32_t, NErrorsDefined> ErrActions = {
@@ -143,6 +145,7 @@ struct ChipStat {
     ErrActPropagate | ErrActDump, // ALPIDE MEB was flushed by the busy handling
     ErrActPropagate | ErrActDump, // ALPIDE received a second trigger while the strobe was still open
     ErrActPropagate | ErrActDump, // Impossible for given cable ALPIDE ChipOnModule ID
+    ErrActPropagate | ErrActDump, // Decreasing row in the same column
   };
   uint16_t feeID = -1;
   size_t nHits = 0;
@@ -285,6 +288,14 @@ struct GBTLinkDecodingStat {
   void print(bool skipNoErr = true) const;
 
   ClassDefNV(GBTLinkDecodingStat, 3);
+};
+
+struct ErrorMessage {
+  uint16_t id = -1;
+  uint16_t errType = 0;
+  uint16_t errInfo0 = 0;
+  uint16_t errInfo1 = 0;
+  ClassDefNV(ErrorMessage, 1)
 };
 
 } // namespace itsmft

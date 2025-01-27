@@ -58,6 +58,9 @@ static constexpr bool is_enumeration_v = false;
 template <int64_t BEGIN, int64_t END, int64_t STEP>
 static constexpr bool is_enumeration_v<Enumeration<BEGIN, END, STEP>> = true;
 
+template <typename T>
+concept is_enumeration = is_enumeration_v<T>;
+
 // Helper struct which builds a DataProcessorSpec from
 // the contents of an AnalysisTask...
 namespace {
@@ -65,7 +68,7 @@ struct AnalysisDataProcessorBuilder {
   template <typename T>
   static ConfigParamSpec getSpec()
   {
-    if constexpr (soa::is_type_with_metadata_v<aod::MetadataTrait<T>>) {
+    if constexpr (soa::has_metadata<aod::MetadataTrait<T>>) {
       return ConfigParamSpec{std::string{"input:"} + aod::MetadataTrait<T>::metadata::tableLabel(), VariantType::String, aod::MetadataTrait<T>::metadata::sourceSpec(), {"\"\""}};
     } else {
       using O1 = framework::pack_element_t<0, typename T::originals>;
@@ -73,25 +76,24 @@ struct AnalysisDataProcessorBuilder {
     }
   }
 
-  template <typename... T>
-  static inline std::vector<ConfigParamSpec> getInputSpecs(framework::pack<T...>)
+  template <soa::TableRef R>
+  static ConfigParamSpec getSpec()
   {
-    return std::vector{getSpec<T>()...};
+    return soa::tableRef2ConfigParamSpec<R>();
   }
 
-  template <typename T>
-  static inline auto getSources() requires soa::is_soa_index_table_v<std::decay_t<T>>
+  template <soa::with_sources T>
+  static inline auto getSources()
   {
-    return getInputSpecs(typename T::sources_t{});
+    return []<size_t N, std::array<soa::TableRef, N> refs>() {
+      return []<size_t... Is>(std::index_sequence<Is...>) {
+        return std::vector{soa::tableRef2ConfigParamSpec<refs[Is]>()...};
+      }(std::make_index_sequence<N>());
+    }.template operator()<T::sources.size(), T::sources>();
   }
 
-  template <typename T>
-  static inline auto getSources() requires soa::is_soa_extension_table_v<std::decay_t<T>>
-  {
-    return getInputSpecs(typename aod::MetadataTrait<T>::metadata::sources{});
-  }
+  template <soa::with_sources T>
 
-  template <typename T>
   static auto getInputMetadata()
   {
     std::vector<ConfigParamSpec> inputMetadata;
@@ -107,11 +109,14 @@ struct AnalysisDataProcessorBuilder {
   static void addGroupingCandidates(std::vector<StringPair>& bk, std::vector<StringPair>& bku)
   {
     [&bk, &bku]<typename... As>(framework::pack<As...>) mutable {
-      auto key = std::string{"fIndex"} + o2::framework::cutString(soa::getLabelFromType<std::decay_t<G>>());
+      std::string key;
+      if constexpr (soa::is_iterator<std::decay_t<G>>) {
+        key = std::string{"fIndex"} + o2::framework::cutString(soa::getLabelFromType<std::decay_t<G>>());
+      }
       ([&bk, &bku, &key]() mutable {
         if constexpr (soa::relatedByIndex<std::decay_t<G>, std::decay_t<As>>()) {
           auto binding = soa::getLabelFromTypeForKey<std::decay_t<As>>(key);
-          if constexpr (o2::soa::is_smallgroups_v<std::decay_t<As>>) {
+          if constexpr (o2::soa::is_smallgroups<std::decay_t<As>>) {
             framework::updatePairList(bku, binding, key);
           } else {
             framework::updatePairList(bk, binding, key);
@@ -122,24 +127,24 @@ struct AnalysisDataProcessorBuilder {
     }(framework::pack<Args...>{});
   }
 
-  template <typename O>
-  static void addOriginal(const char* name, bool value, std::vector<InputSpec>& inputs) requires soa::is_type_with_metadata_v<aod::MetadataTrait<std::decay_t<O>>>
+  template <soa::TableRef R>
+  static void addOriginalRef(const char* name, bool value, std::vector<InputSpec>& inputs)
   {
-    using metadata = typename aod::MetadataTrait<std::decay_t<O>>::metadata;
+    using metadata = typename aod::MetadataTrait<o2::aod::Hash<R.desc_hash>>::metadata;
     std::vector<ConfigParamSpec> inputMetadata;
     inputMetadata.emplace_back(ConfigParamSpec{std::string{"control:"} + name, VariantType::Bool, value, {"\"\""}});
-    if constexpr (soa::is_soa_index_table_v<std::decay_t<O>> || soa::is_soa_extension_table_v<std::decay_t<O>>) {
-      auto inputSources = getInputMetadata<std::decay_t<O>>();
+    if constexpr (soa::with_sources<metadata>) {
+      auto inputSources = getInputMetadata<metadata>();
       inputMetadata.insert(inputMetadata.end(), inputSources.begin(), inputSources.end());
     }
-    DataSpecUtils::updateInputList(inputs, InputSpec{metadata::tableLabel(), metadata::origin(), metadata::description(), metadata::version(), Lifetime::Timeframe, inputMetadata});
+    DataSpecUtils::updateInputList(inputs, InputSpec{o2::aod::label<R>(), o2::aod::origin<R>(), aod::description(o2::aod::signature<R>()), R.version, Lifetime::Timeframe, inputMetadata});
   }
 
   template <typename R, typename C, typename... Args>
   static void inputsFromArgs(R (C::*)(Args...), const char* name, bool value, std::vector<InputSpec>& inputs, std::vector<ExpressionInfo>& eInfos, std::vector<StringPair>& bk, std::vector<StringPair>& bku) requires(std::is_lvalue_reference_v<Args>&&...)
   {
     // update grouping cache
-    if constexpr (soa::is_soa_iterator_v<std::decay_t<framework::pack_element_t<0, framework::pack<Args...>>>>) {
+    if constexpr (soa::is_iterator<std::decay_t<framework::pack_element_t<0, framework::pack<Args...>>>>) {
       addGroupingCandidates<Args...>(bk, bku);
     }
 
@@ -149,107 +154,116 @@ struct AnalysisDataProcessorBuilder {
     ([&name, &value, &eInfos, &inputs, &hash, &ai]() mutable {
       ++ai;
       using T = std::decay_t<Args>;
-      if constexpr (is_enumeration_v<T>) {
+      if constexpr (is_enumeration<T>) {
         std::vector<ConfigParamSpec> inputMetadata;
         // FIXME: for the moment we do not support begin, end and step.
         DataSpecUtils::updateInputList(inputs, InputSpec{"enumeration", "DPL", "ENUM", 0, Lifetime::Enumeration, inputMetadata});
       } else {
         // populate expression infos
-        if constexpr (soa::is_soa_filtered_v<T>) {
+        if constexpr (soa::is_filtered_table<T>) {
           auto fields = soa::createFieldsFromColumns(typename T::persistent_columns_t{});
           eInfos.emplace_back(ai, hash, T::hashes(), std::make_shared<arrow::Schema>(fields));
-        } else if constexpr (soa::is_soa_filtered_iterator_v<T>()) {
+        } else if constexpr (soa::is_filtered_iterator<T>) {
           auto fields = soa::createFieldsFromColumns(typename T::parent_t::persistent_columns_t{});
           eInfos.emplace_back(ai, hash, T::parent_t::hashes(), std::make_shared<arrow::Schema>(fields));
         }
         // add inputs from the originals
-        [&name, &value, &inputs]<typename... Os>(framework::pack<Os...>) mutable {
-          (addOriginal<Os>(name, value, inputs), ...);
-        }(soa::make_originals_from_type<T>());
+        auto adder = [&name, &value, &inputs]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>) mutable {
+          (addOriginalRef<refs[Is]>(name, value, inputs), ...);
+        };
+        if constexpr (soa::is_table<T> || soa::is_filtered_table<T>) {
+          adder.template operator()<T::originals.size(), T::originals>(std::make_index_sequence<T::originals.size()>());
+        } else if constexpr (soa::is_iterator<T> || soa::is_filtered_iterator<T>) {
+          adder.template operator()<T::parent_t::originals.size(), T::parent_t::originals>(std::make_index_sequence<T::parent_t::originals.size()>());
+        }
       }
       return true;
     }() &&
      ...);
   }
 
-  template <typename T>
-  static auto extractTableFromRecord(InputRecord& record) requires soa::is_type_with_metadata_v<aod::MetadataTrait<T>>
+  template <soa::TableRef R>
+  static auto extractTableFromRecord(InputRecord& record)
   {
-    auto table = record.get<TableConsumer>(aod::MetadataTrait<T>::metadata::tableLabel())->asArrowTable();
+    auto table = record.get<TableConsumer>(o2::aod::label<R>())->asArrowTable();
     if (table->num_rows() == 0) {
-      table = makeEmptyTable<T>(aod::MetadataTrait<T>::metadata::tableLabel());
+      table = makeEmptyTable<R>();
     }
     return table;
   }
 
-  template <typename T>
-  static auto extractTableFromRecord(InputRecord& record) requires soa::is_type_with_originals_v<T>
+  template <soa::is_table T>
+  static auto extractFromRecord(InputRecord& record)
   {
-    return extractFromRecord<T>(record, typename T::originals{});
+    return T { [&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>) { return std::vector{extractTableFromRecord<refs[Is]>(record)...}; }.template operator()<T::originals.size(), T::originals>(std::make_index_sequence<T::originals.size()>()) };
   }
 
-  template <typename T, typename... Os>
-  static auto extractFromRecord(InputRecord& record, pack<Os...> const&)
+  template <soa::is_iterator T>
+  static auto extractFromRecord(InputRecord& record)
   {
-    if constexpr (soa::is_soa_iterator_v<T>) {
-      return typename T::parent_t{{extractTableFromRecord<Os>(record)...}};
+    return typename T::parent_t { [&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>) { return std::vector{extractTableFromRecord<refs[Is]>(record)...}; }.template operator()<T::parent_t::originals.size(), T::parent_t::originals>(std::make_index_sequence<T::parent_t::originals.size()>()) };
+  }
+
+  template <soa::is_filtered T>
+  static auto extractFilteredFromRecord(InputRecord& record, ExpressionInfo& info)
+  {
+    std::shared_ptr<arrow::Table> table = nullptr;
+    auto joiner = [&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>) { return std::vector{extractTableFromRecord<refs[Is]>(record)...}; };
+    if constexpr (soa::is_iterator<T>) {
+      table = o2::soa::ArrowHelpers::joinTables(joiner.template operator()<T::parent_t::originals.size(), T::parent_t::originals>(std::make_index_sequence<T::parent_t::originals.size()>()));
     } else {
-      return T{{extractTableFromRecord<Os>(record)...}};
+      table = o2::soa::ArrowHelpers::joinTables(joiner.template operator()<T::originals.size(), T::originals>(std::make_index_sequence<T::originals.size()>()));
     }
-  }
-
-  template <typename T, typename... Os>
-  static auto extractFilteredFromRecord(InputRecord& record, ExpressionInfo& info, pack<Os...> const&)
-  {
-    auto table = o2::soa::ArrowHelpers::joinTables(std::vector<std::shared_ptr<arrow::Table>>{extractTableFromRecord<Os>(record)...});
     expressions::updateFilterInfo(info, table);
-    if constexpr (!o2::soa::is_smallgroups_v<std::decay_t<T>>) {
+    if constexpr (!o2::soa::is_smallgroups<std::decay_t<T>>) {
       if (info.selection == nullptr) {
         soa::missingFilterDeclaration(info.processHash, info.argumentIndex);
       }
     }
-    if constexpr (soa::is_soa_iterator_v<T>) {
+    if constexpr (soa::is_iterator<T>) {
       return typename T::parent_t({table}, info.selection);
     } else {
       return T({table}, info.selection);
     }
   }
 
-  template <typename T, int AI>
-  static auto extract(InputRecord&, std::vector<ExpressionInfo>&, size_t) requires is_enumeration_v<T>
+  template <is_enumeration T, int AI>
+  static auto extract(InputRecord&, std::vector<ExpressionInfo>&, size_t)
   {
     return T{};
   }
 
-  template <typename T, int AI>
-  static auto extract(InputRecord& record, std::vector<ExpressionInfo>& infos, size_t phash) requires soa::is_soa_iterator_v<T>
+  template <soa::is_iterator T, int AI>
+  static auto extract(InputRecord& record, std::vector<ExpressionInfo>& infos, size_t phash)
   {
-    if constexpr (std::is_same_v<typename T::policy_t, soa::FilteredIndexPolicy>) {
-      return extractFilteredFromRecord<T>(record, *std::find_if(infos.begin(), infos.end(), [&phash](ExpressionInfo const& i) { return (i.processHash == phash && i.argumentIndex == AI); }), soa::make_originals_from_type<T>());
+    if constexpr (std::same_as<typename T::policy_t, soa::FilteredIndexPolicy>) {
+      return extractFilteredFromRecord<T>(record, *std::find_if(infos.begin(), infos.end(), [&phash](ExpressionInfo const& i) { return (i.processHash == phash && i.argumentIndex == AI); }));
     } else {
-      return extractFromRecord<T>(record, soa::make_originals_from_type<T>());
+      return extractFromRecord<T>(record);
     }
   }
 
-  template <typename T, int AI>
-  static auto extract(InputRecord& record, std::vector<ExpressionInfo>& infos, size_t phash) requires soa::is_soa_table_like_v<T>
+  template <soa::is_table T, int AI>
+  static auto extract(InputRecord& record, std::vector<ExpressionInfo>& infos, size_t phash)
   {
-    if constexpr (soa::is_soa_filtered_v<T>) {
-      return extractFilteredFromRecord<T>(record, *std::find_if(infos.begin(), infos.end(), [&phash](ExpressionInfo const& i) { return (i.processHash == phash && i.argumentIndex == AI); }), soa::make_originals_from_type<T>());
+    if constexpr (soa::is_filtered_table<T>) {
+      return extractFilteredFromRecord<T>(record, *std::find_if(infos.begin(), infos.end(), [&phash](ExpressionInfo const& i) { return (i.processHash == phash && i.argumentIndex == AI); }));
     } else {
-      return extractFromRecord<T>(record, soa::make_originals_from_type<T>());
+      return extractFromRecord<T>(record);
     }
   }
 
   template <typename R, typename C, typename Grouping, typename... Args>
-  static auto bindGroupingTable(InputRecord& record, R (C::*)(Grouping, Args...), std::vector<ExpressionInfo>& infos) requires(!std::is_same_v<Grouping, void> || sizeof...(Args) > 0)
+  static auto bindGroupingTable(InputRecord& record, R (C::*)(Grouping, Args...), std::vector<ExpressionInfo>& infos)
+    requires(!std::same_as<Grouping, void>)
   {
     constexpr auto hash = o2::framework::TypeIdHelpers::uniqueId<R (C::*)(Grouping, Args...)>();
     return extract<std::decay_t<Grouping>, 0>(record, infos, hash);
   }
 
   template <typename R, typename C, typename Grouping, typename... Args>
-  static auto bindAssociatedTables(InputRecord& record, R (C::*)(Grouping, Args...), std::vector<ExpressionInfo>& infos) requires(!std::is_same_v<Grouping, void> || sizeof...(Args) > 0)
+  static auto bindAssociatedTables(InputRecord& record, R (C::*)(Grouping, Args...), std::vector<ExpressionInfo>& infos)
+    requires(!std::same_as<Grouping, void> && sizeof...(Args) > 0)
   {
     constexpr auto p = pack<Args...>{};
     constexpr auto hash = o2::framework::TypeIdHelpers::uniqueId<R (C::*)(Grouping, Args...)>();
@@ -284,18 +298,18 @@ struct AnalysisDataProcessorBuilder {
         return true;
       },
                              task);
-      if constexpr (soa::is_soa_iterator_v<G>) {
+      if constexpr (soa::is_iterator<G>) {
         for (auto& element : groupingTable) {
           std::invoke(processingFunction, task, *element);
         }
       } else {
-        static_assert(soa::is_soa_table_like_v<G> || is_enumeration_v<G>,
+        static_assert(soa::is_table<G> || is_enumeration<G>,
                       "Single argument of process() should be a table-like or an iterator");
         std::invoke(processingFunction, task, groupingTable);
       }
     } else {
       // multiple arguments to process
-      static_assert(((soa::is_soa_iterator_v<std::decay_t<Associated>> == false) && ...),
+      static_assert(((soa::is_iterator<std::decay_t<Associated>> == false) && ...),
                     "Associated arguments of process() should not be iterators");
       auto associatedTables = AnalysisDataProcessorBuilder::bindAssociatedTables(inputs, processingFunction, infos);
       // pre-bind self indices
@@ -336,7 +350,7 @@ struct AnalysisDataProcessorBuilder {
       },
                              task);
       overwriteInternalIndices(associatedTables, associatedTables);
-      if constexpr (soa::is_soa_iterator_v<std::decay_t<G>>) {
+      if constexpr (soa::is_iterator<std::decay_t<G>>) {
         auto slicer = GroupSlicer(groupingTable, associatedTables, slices);
         for (auto& slice : slicer) {
           auto associatedSlices = slice.associatedTables();
@@ -490,7 +504,7 @@ DataProcessorSpec adaptAnalysisTask(ConfigContext const& ctx, Args&&... args)
   homogeneous_apply_refs(
     [name = name_str, &expressionInfos, &inputs, &bindingsKeys, &bindingsKeysUnsorted](auto& x) {
       using D = std::decay_t<decltype(x)>;
-      if constexpr (is_base_of_template_v<ProcessConfigurable, D>) {
+      if constexpr (base_of_template<ProcessConfigurable, D>) {
         // this pushes (argumentIndex,processHash,schemaPtr,nullptr) into expressionInfos for arguments that are Filtered/filtered_iterators
         AnalysisDataProcessorBuilder::inputsFromArgs(x.process, (name + "/" + x.name).c_str(), x.value, inputs, expressionInfos, bindingsKeys, bindingsKeysUnsorted);
         return true;
@@ -602,7 +616,7 @@ DataProcessorSpec adaptAnalysisTask(ConfigContext const& ctx, Args&&... args)
       // execute optional process()
       homogeneous_apply_refs(
         [&pc, &expressionInfos, &task, &slices](auto& x) mutable {
-          if constexpr (is_base_of_template_v<ProcessConfigurable, std::decay_t<decltype(x)>>) {
+          if constexpr (base_of_template<ProcessConfigurable, std::decay_t<decltype(x)>>) {
             if (x.value == true) {
               AnalysisDataProcessorBuilder::invokeProcess(*task.get(), pc.inputs(), x.process, expressionInfos, slices);
               return true;

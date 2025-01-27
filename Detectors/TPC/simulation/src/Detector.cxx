@@ -13,6 +13,7 @@
 #include "TPCSimulation/Detector.h"
 #include "TPCSimulation/Point.h"
 #include "TPCBase/ParameterGas.h"
+#include "TPCBase/ParameterDetector.h"
 
 #include "DetectorsBase/Stack.h"
 #include "SimulationDataFormat/TrackReference.h"
@@ -104,6 +105,7 @@ Bool_t Detector::ProcessHits(FairVolume* vol)
 {
   mStepCounter++;
   auto& gasParam = ParameterGas::Instance();
+  auto& detParam = ParameterDetector::Instance();
   const Int_t kMaxDistRef = 15;       // maximal difference between 2 stored references - the parameter should be 15 cm as default
   static Double_t lastReferenceR = 0; // keeps last reference point in radius (cm)
 
@@ -151,11 +153,34 @@ Bool_t Detector::ProcessHits(FairVolume* vol)
   if (fMC->IsTrackEntering() || fMC->IsTrackExiting()) {
     stack->addTrackReference(o2::TrackReference(position.X(), position.Y(), position.Z(), momentum.X(), momentum.Y(),
                                                 momentum.Z(), fMC->TrackLength(), time, trackID, GetDetId()));
+    lastReferenceR = fMC->TrackLength();
   }
   if (TMath::Abs(lastReferenceR - fMC->TrackLength()) > kMaxDistRef) { /// we can speedup
     stack->addTrackReference(o2::TrackReference(position.X(), position.Y(), position.Z(), momentum.X(), momentum.Y(),
                                                 momentum.Z(), fMC->TrackLength(), time, trackID, GetDetId()));
     lastReferenceR = fMC->TrackLength();
+  }
+
+  // ---| remove clusters between the IFC and the FC strips |---
+  // those should not enter the active readout area
+  // do coarse selection before, to limit number of transformations
+  if (detParam.ExcludeFCGap) {
+    const auto rCluster = std::sqrt(position.X() * position.X() + position.Y() * position.Y());
+    const float rodRin = 81.5 + 2.2;    // radial position of the inner field cage rods + radial size of the field cage rods
+    const float rodRout = 254.25 + 2.2; // radial position of the outer field cage rods + radial size of the field cage rods
+    const float fcLxIn = 82.428409;     // position of the inner FC strips in local x = cos(10 deg) * rodRin;
+    const float fcLxOut = 252.55395;    // position of the outer FC strips in local x = cos(10 deg) * rodRin;
+
+    if (rCluster < rodRin || rCluster > fcLxOut) {
+      const int sectorIDnonShift = static_cast<int>(Sector::ToSector(position.X(), position.Y(), position.Z()));
+      const double alpha = TMath::DegToRad() * (10. + sectorIDnonShift * 20.);
+      const double cs = std::cos(-alpha), sn = std::sin(-alpha);
+      const auto localX = position.X() * cs - position.Y() * sn;
+      // fine cut
+      if (localX < fcLxIn || localX > fcLxOut) {
+        return kFALSE;
+      }
+    }
   }
 
   // ===| CONVERT THE ENERGY LOSS TO IONIZATION ELECTRONS |=====================

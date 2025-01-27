@@ -17,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <regex>
 #include <iostream>
 
 using namespace o2::framework::data_matcher;
@@ -319,12 +320,9 @@ std::vector<InputSpec> DataDescriptorQueryBuilder::parse(char const* config)
           if (*currentKey == "lifetime" && currentValue == "condition") {
             currentLifetime = Lifetime::Condition;
           }
-          if (*currentKey == "ccdb-run-dependent" && (currentValue != "false" && currentValue != "0")) {
-            attributes.push_back(ConfigParamSpec{*currentKey, VariantType::Bool, true, {}});
-          } else if (*currentKey == "ccdb-run-dependent" && (currentValue == "false" || currentValue == "0")) {
-            attributes.push_back(ConfigParamSpec{*currentKey, VariantType::Bool, false, {}});
-          } else if (*currentKey == "ccdb-run-dependent") {
-            error("ccdb-run-dependent can only be true or false");
+          if (*currentKey == "ccdb-run-dependent") {
+            int val = currentValue == "false" ? 0 : (currentValue == "true" ? 1 : std::stoi(*currentValue));
+            attributes.push_back(ConfigParamSpec{*currentKey, VariantType::Int, val, {}});
           } else {
             attributes.push_back(ConfigParamSpec{*currentKey, VariantType::String, *currentValue, {}});
           }
@@ -333,12 +331,9 @@ std::vector<InputSpec> DataDescriptorQueryBuilder::parse(char const* config)
           if (*currentKey == "lifetime" && currentValue == "condition") {
             currentLifetime = Lifetime::Condition;
           }
-          if (*currentKey == "ccdb-run-dependent" && (currentValue != "false" && currentValue != "0")) {
-            attributes.push_back(ConfigParamSpec{*currentKey, VariantType::Bool, true, {}});
-          } else if (*currentKey == "ccdb-run-dependent" && (currentValue == "false" || currentValue == "0")) {
-            attributes.push_back(ConfigParamSpec{*currentKey, VariantType::Bool, false, {}});
-          } else if (*currentKey == "ccdb-run-dependent") {
-            error("ccdb-run-dependent can only be true or false");
+          if (*currentKey == "ccdb-run-dependent") {
+            int val = currentValue == "false" ? 0 : (currentValue == "true" ? 1 : std::stoi(*currentValue));
+            attributes.push_back(ConfigParamSpec{*currentKey, VariantType::Int, val, {}});
           } else {
             attributes.push_back(ConfigParamSpec{*currentKey, VariantType::String, *currentValue, {}});
           }
@@ -347,12 +342,9 @@ std::vector<InputSpec> DataDescriptorQueryBuilder::parse(char const* config)
           if (*currentKey == "lifetime" && currentValue == "condition") {
             currentLifetime = Lifetime::Condition;
           }
-          if (*currentKey == "ccdb-run-dependent" && (currentValue != "false" && currentValue != "0")) {
-            attributes.push_back(ConfigParamSpec{*currentKey, VariantType::Bool, true, {}});
-          } else if (*currentKey == "ccdb-run-dependent" && (currentValue == "false" || currentValue == "0")) {
-            attributes.push_back(ConfigParamSpec{*currentKey, VariantType::Bool, false, {}});
-          } else if (*currentKey == "ccdb-run-dependent") {
-            error("ccdb-run-dependent can only be true or false");
+          if (*currentKey == "ccdb-run-dependent") {
+            int val = currentValue == "false" ? 0 : (currentValue == "true" ? 1 : std::stoi(*currentValue));
+            attributes.push_back(ConfigParamSpec{*currentKey, VariantType::Int, val, {}});
           } else {
             attributes.push_back(ConfigParamSpec{*currentKey, VariantType::String, *currentValue, {}});
           }
@@ -456,7 +448,7 @@ DataDescriptorQuery DataDescriptorQueryBuilder::buildFromExtendedKeepConfig(std:
 std::unique_ptr<DataDescriptorMatcher> DataDescriptorQueryBuilder::buildNode(std::string const& nodeString)
 {
 
-  std::smatch m = getTokens(nodeString);
+  auto m = getTokens(nodeString);
 
   std::unique_ptr<DataDescriptorMatcher> next;
   auto newNode = std::make_unique<DataDescriptorMatcher>(
@@ -470,15 +462,19 @@ std::unique_ptr<DataDescriptorMatcher> DataDescriptorQueryBuilder::buildNode(std
   return newNode;
 }
 
-std::smatch DataDescriptorQueryBuilder::getTokens(std::string const& nodeString)
+std::vector<std::string> DataDescriptorQueryBuilder::getTokens(std::string const& nodeString)
 {
 
   static const std::regex specTokenRE(R"re((\w{1,4})/(\w{1,16})/(\d*))re");
-  std::smatch m;
+  std::smatch match;
 
-  std::regex_match(nodeString, m, specTokenRE);
+  std::regex_match(nodeString, match, specTokenRE);
 
-  return m;
+  std::vector<std::string> result;
+  for (size_t i = 0; i < 4; ++i) {
+    result.push_back(match[i].str());
+  }
+  return result;
 }
 
 } // namespace o2::framework

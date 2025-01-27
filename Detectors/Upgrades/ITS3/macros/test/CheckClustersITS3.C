@@ -57,7 +57,8 @@ void CheckClustersITS3(const std::string& clusfile = "o2clus_its.root",
   using ROFRec = o2::itsmft::ROFRecord;
   using MC2ROF = o2::itsmft::MC2ROFRecord;
   using HitVec = std::vector<Hit>;
-  using MC2HITS_map = std::unordered_map<uint64_t, int>; // maps (track_ID<<16 + chip_ID) to entry in the hit vector
+  using MC2HITS_map = std::unordered_map<uint64_t, int>; // maps (track_ID<<32 + chip_ID) to entry in the hit vector
+  std::array<SuperSegmentation, 3> mSuperSegmentations{0, 1, 2};
 
   std::vector<HitVec*> hitVecPool;
   std::vector<MC2HITS_map> mc2hitVec;

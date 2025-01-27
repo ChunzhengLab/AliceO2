@@ -22,7 +22,7 @@
 #include "GPUTPCGeometry.h"
 #include "GPUTPCGMPolynomialField.h"
 
-#if !defined(GPUCA_GPUCODE) && defined(GPUCA_NOCOMPAT)
+#if !defined(GPUCA_GPUCODE)
 namespace o2::base
 {
 template <typename>
@@ -59,6 +59,7 @@ struct GPUParam_t {
 
   int8_t dodEdxDownscaled;
   int32_t continuousMaxTimeBin;
+  int32_t tpcCutTimeBin;
 
   GPUTPCGeometry tpcGeometry;                       // TPC Geometry
   GPUTPCGMPolynomialField polynomialField;          // Polynomial approx. of magnetic field for TPC GM
@@ -77,14 +78,12 @@ struct GPUParam_t {
 };
 } // namespace internal
 
-#if !(defined(__CINT__) || defined(__ROOTCINT__)) || defined(__CLING__) // Hide from ROOT 5 CINT
-MEM_CLASS_PRE()
 struct GPUParam : public internal::GPUParam_t<GPUSettingsRec, GPUSettingsParam> {
 
 #ifndef GPUCA_GPUCODE
   void SetDefaults(float solenoidBz);
   void SetDefaults(const GPUSettingsGRP* g, const GPUSettingsRec* r = nullptr, const GPUSettingsProcessing* p = nullptr, const GPURecoStepConfiguration* w = nullptr);
-  void UpdateSettings(const GPUSettingsGRP* g, const GPUSettingsProcessing* p = nullptr, const GPURecoStepConfiguration* w = nullptr);
+  void UpdateSettings(const GPUSettingsGRP* g, const GPUSettingsProcessing* p = nullptr, const GPURecoStepConfiguration* w = nullptr, const GPUSettingsRecDynamic* d = nullptr);
   void UpdateBzOnly(float newSolenoidBz);
   void LoadClusterErrors(bool Print = 0);
   void UpdateRun3ClusterErrors(const float* yErrorParam, const float* zErrorParam);
@@ -115,7 +114,6 @@ struct GPUParam : public internal::GPUParam_t<GPUSettingsRec, GPUSettingsParam> 
 
   GPUd() bool rejectEdgeClusterByY(float uncorrectedY, int32_t iRow, float trackSigmaY) const;
 };
-#endif
 
 } // namespace gpu
 } // namespace GPUCA_NAMESPACE

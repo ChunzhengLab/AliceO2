@@ -284,11 +284,6 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     }
     // get exit pixel row and col
     while (!SegmentationsIB[layer].localToDetector(xyzLocE.X(), xyzLocE.Z(), rowE, colE)) { // guard-ring ?
-      if (++nSkip >= nSteps) {
-        return; // did not enter to sensitive matrix
-      }
-      xyzLocE -= step;
-    }
   } else {
     // get entrance pixel row and col
     while (!SegmentationOB::localToDetector(xyzLocS.X(), xyzLocS.Z(), rowS, colS)) { // guard-ring ?
@@ -365,22 +360,19 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     // Get the pixel ID
     if (innerBarrel) {
       SegmentationsIB[layer].localToDetector(xyzLocS.X(), xyzLocS.Z(), row, col);
-    } else {
       SegmentationOB::localToDetector(xyzLocS.X(), xyzLocS.Z(), row, col);
-    }
-    if (row != rowPrev || col != colPrev) { // update pixel and coordinates of its center //确定是不是进入了新的pixel
-      if (innerBarrel) {
+<<<<<<< HEAD
         if (!SegmentationsIB[layer].detectorToLocal(row, col, cRowPix, cColPix)) {
+=======
+        if (!mSuperSegmentations[layer].detectorToLocal(row, col, cRowPix, cColPix)) {
           continue;
-        }
-      } else if (!SegmentationOB::detectorToLocal(row, col, cRowPix, cColPix)) {
-        continue; // should not happen
       }
       rowPrev = row;
       colPrev = col;
     }
     bool flipCol = false, flipRow = false;
     // note that response needs coordinates along column row (locX) (locZ) then depth (locY)
+<<<<<<< HEAD
     double rowMax{0.5f * (innerBarrel ? SegmentationIB::mPitchRow : SegmentationOB::PitchRow)};
     double colMax{0.5f * (innerBarrel ? SegmentationIB::mPitchCol : SegmentationOB::PitchCol)};
 

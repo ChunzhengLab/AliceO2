@@ -11,7 +11,6 @@
 
 #ifndef O2_FRAMEWORK_INDEXBUILDERHELPERS_H_
 #define O2_FRAMEWORK_INDEXBUILDERHELPERS_H_
-#include "Framework/RuntimeError.h"
 #include "arrow/array.h"
 #include <arrow/chunked_array.h>
 #include <arrow/builder.h>
@@ -22,6 +21,8 @@
 
 namespace o2::framework
 {
+void cannotBuildAnArray();
+
 struct ChunkedArrayIterator {
   ChunkedArrayIterator(std::shared_ptr<arrow::ChunkedArray> source);
   virtual ~ChunkedArrayIterator() = default;
@@ -51,7 +52,7 @@ struct SelfIndexColumnBuilder {
     std::shared_ptr<arrow::Array> array;
     auto status = static_cast<arrow::Int32Builder*>(mBuilder.get())->Finish(&array);
     if (!status.ok()) {
-      throw runtime_error("Cannot build an array");
+      cannotBuildAnArray();
     }
 
     return std::make_shared<arrow::ChunkedArray>(array);
@@ -83,9 +84,9 @@ class IndexColumnBuilder : public SelfIndexColumnBuilder, public ChunkedArrayIte
   template <typename C>
   inline std::shared_ptr<arrow::ChunkedArray> result() const
   {
-    if constexpr (std::is_same_v<typename C::type, std::vector<int>>) {
+    if constexpr (std::same_as<typename C::type, std::vector<int>>) {
       return resultMulti();
-    } else if constexpr (std::is_same_v<typename C::type, int[2]>) {
+    } else if constexpr (std::same_as<typename C::type, int[2]>) {
       return resultSlice();
     } else {
       return resultSingle();
@@ -95,9 +96,9 @@ class IndexColumnBuilder : public SelfIndexColumnBuilder, public ChunkedArrayIte
   template <typename C>
   inline bool find(int idx)
   {
-    if constexpr (std::is_same_v<typename C::type, std::vector<int>>) {
+    if constexpr (std::same_as<typename C::type, std::vector<int>>) {
       return findMulti(idx);
-    } else if constexpr (std::is_same_v<typename C::type, int[2]>) {
+    } else if constexpr (std::same_as<typename C::type, int[2]>) {
       return findSlice(idx);
     } else {
       return findSingle(idx);
@@ -108,9 +109,9 @@ class IndexColumnBuilder : public SelfIndexColumnBuilder, public ChunkedArrayIte
   inline void fill(int idx)
   {
     ++mResultSize;
-    if constexpr (std::is_same_v<typename C::type, std::vector<int>>) {
+    if constexpr (std::same_as<typename C::type, std::vector<int>>) {
       fillMulti(idx);
-    } else if constexpr (std::is_same_v<typename C::type, int[2]>) {
+    } else if constexpr (std::same_as<typename C::type, int[2]>) {
       fillSlice(idx);
     } else {
       fillSingle(idx);

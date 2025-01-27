@@ -42,7 +42,7 @@ class TrackParametrizationWithError : public TrackParametrization<value_T>
   using MatrixDSym5 = o2::math_utils::SMatrix<double, kNParams, kNParams, o2::math_utils::MatRepSym<double, kNParams>>;
   using MatrixD5 = o2::math_utils::SMatrix<double, kNParams, kNParams, o2::math_utils::MatRepStd<double, kNParams, kNParams>>;
 
-  GPUd() TrackParametrizationWithError();
+  GPUhd() TrackParametrizationWithError();
   GPUd() TrackParametrizationWithError(value_t x, value_t alpha, const params_t& par, const covMat_t& cov, int charge = 1, const PID pid = PID::Pion);
   GPUd() TrackParametrizationWithError(const dim3_t& xyz, const dim3_t& pxpypz,
                                        const gpu::gpustd::array<value_t, kLabCovMatSize>& cv, int sign, bool sectorAlpha = true, const PID pid = PID::Pion);
@@ -100,6 +100,8 @@ class TrackParametrizationWithError : public TrackParametrization<value_T>
 
   template <typename T>
   GPUd() value_t getPredictedChi2(const BaseCluster<T>& p) const;
+  template <typename T>
+  GPUd() value_t getPredictedChi2Quiet(const BaseCluster<T>& p) const;
 
   GPUd() void buildCombinedCovMatrix(const TrackParametrizationWithError& rhs, MatrixDSym5& cov) const;
   GPUd() value_t getPredictedChi2(const TrackParametrizationWithError& rhs, MatrixDSym5& covToSet) const;
@@ -145,7 +147,7 @@ class TrackParametrizationWithError : public TrackParametrization<value_T>
 
 //__________________________________________________________________________
 template <typename value_T>
-GPUdi() TrackParametrizationWithError<value_T>::TrackParametrizationWithError() : TrackParametrization<value_T>{}
+GPUhdi() TrackParametrizationWithError<value_T>::TrackParametrizationWithError() : TrackParametrization<value_T>{}
 {
 }
 
@@ -313,6 +315,16 @@ GPUdi() auto TrackParametrizationWithError<value_T>::getPredictedChi2(const Base
   const dim2_t pyz = {value_T(p.getY()), value_T(p.getZ())};
   const dim3_t cov = {value_T(p.getSigmaY2()), value_T(p.getSigmaYZ()), value_T(p.getSigmaZ2())};
   return getPredictedChi2(pyz, cov);
+}
+
+//__________________________________________________________________________
+template <typename value_T>
+template <typename T>
+GPUdi() auto TrackParametrizationWithError<value_T>::getPredictedChi2Quiet(const BaseCluster<T>& p) const -> value_t
+{
+  const dim2_t pyz = {value_T(p.getY()), value_T(p.getZ())};
+  const dim3_t cov = {value_T(p.getSigmaY2()), value_T(p.getSigmaYZ()), value_T(p.getSigmaZ2())};
+  return getPredictedChi2Quiet(pyz, cov);
 }
 
 //______________________________________________

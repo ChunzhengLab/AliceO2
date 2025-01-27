@@ -66,13 +66,13 @@ class Spline1DContainer : public FlatObject
   /// _____________  C++ constructors / destructors __________________________
 
   /// Default constructor, required by the Root IO
-  Spline1DContainer() CON_DEFAULT;
+  Spline1DContainer() = default;
 
   /// Disable all other constructors
-  Spline1DContainer(const Spline1DContainer&) CON_DELETE;
+  Spline1DContainer(const Spline1DContainer&) = delete;
 
   /// Destructor
-  ~Spline1DContainer() CON_DEFAULT;
+  ~Spline1DContainer() = default;
 
   /// _______________  Construction interface  ________________________
 
@@ -448,7 +448,7 @@ class Spline1DSpec<DataT, YdimT, 1>
                            GPUgeneric() const T Sr[/*mYdim*/], GPUgeneric() const T Dr[/*mYdim*/],
                            DataT u, GPUgeneric() T S[/*mYdim*/]) const
   {
-    TBase::template interpolateU(YdimT, knotL, Sl, Dl, Sr, Dr, u, S);
+    TBase::interpolateU(YdimT, knotL, Sl, Dl, Sr, Dr, u, S);
   }
 
   using TBase::getNumberOfKnots;
