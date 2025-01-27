@@ -49,4 +49,4 @@ add_custom_target(
 
 # Install the generated files
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/AlpideResponseData.root" DESTINATION "${CMAKE_INSTALL_PREFIX}/share/Detectors/ITSMFT/data/AlpideResponseData/")
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/AptsResponseData.root" DESTINATION "${CMAKE_INSTALL_PREFIX}/share/Detectors/Upgrade/ITS3/data/ITS3ChipResponseData/")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/AptsResponseData.root" DESTINATION "${CMAKE_INSTALL_PREFIX}/share/Detectors/ITS3/data/ITS3ChipResponseData/")

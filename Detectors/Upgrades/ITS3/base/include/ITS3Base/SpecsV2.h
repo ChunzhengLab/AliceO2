@@ -112,7 +112,7 @@ constexpr unsigned int nSensorsIB{2 * nLayers};
 constexpr float equatorialGap{1 * mm};
 constexpr std::array<unsigned int, nLayers> nSegments{3, 4, 5};
 constexpr float thickness{50 * mu};                                                                                                  //< Physical Thickness of chip
-constexpr float effThickness{66 * mu};                                                                                               //< Physical thickness + metal substrate
+constexpr float effThickness{50 * mu};                                                                                               //< Physical thickness + metal substrate
 constexpr std::array<float, nLayers> radii{19.0006 * mm, 25.228 * mm, 31.4554 * mm};                                                 // middle radius e.g. inner radius+thickness/2.
 constexpr std::array<float, nLayers> radiiInner{radii[0] - thickness / 2.f, radii[1] - thickness / 2.f, radii[2] - thickness / 2.f}; // inner radius
 constexpr std::array<float, nLayers> radiiOuter{radii[0] + thickness / 2.f, radii[1] + thickness / 2.f, radii[2] + thickness / 2.f}; // inner radius
@@ -164,6 +164,15 @@ inline bool isDetITS3(T detID)
 }
 
 } // namespace detID
+namespace extrainfo{
+// chips taped out
+constexpr float aptsPitchX{15.0 * mu};
+constexpr float aptsPitchY{15.0 * mu};
+constexpr float mossTopPitchX{22.5 * mu};
+constexpr float mossTopPitchY{22.5 * mu};
+constexpr float mossBotPitchX{18.0 * mu};
+constexpr float mossBotPitchY{18.0 * mu};
+} // namespace extrainfo
 } // namespace o2::its3::constants
 
 #endif

@@ -78,6 +78,8 @@ class Digitizer : public TObject
 
   void setDeadChannelsMap(const o2::itsmft::NoiseMap* mp) { mDeadChanMap = mp; }
 
+  void isUseAPTSResponse(bool v) { mUseAPTSResp = v; }
+
  private:
   void processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID, int srcID);
   void registerDigits(o2::itsmft::ChipDigitsContainer& chip, uint32_t roFrame, float tInROF, int nROF,
@@ -108,8 +110,8 @@ class Digitizer : public TObject
   uint32_t mEventROFrameMin = 0xffffffff; ///< lowest RO frame for processed events (w/o automatic noise ROFs)
   uint32_t mEventROFrameMax = 0;          ///< highest RO frame forfor processed events (w/o automatic noise ROFs)
 
-  o2::itsmft::AlpideSimResponse* mIBSimResp = nullptr; // simulated response
-  o2::itsmft::AlpideSimResponse* mOBSimResp = nullptr; // simulated response
+  o2::itsmft::AlpideSimResponse* mIBSimResp = nullptr; // simulated response for inner barrel
+  o2::itsmft::AlpideSimResponse* mOBSimResp = nullptr; // simulated response for outer barrel
 
   const o2::its::GeometryTGeo* mGeometry = nullptr; ///< ITS3 geometry
 
@@ -122,7 +124,9 @@ class Digitizer : public TObject
 
   const o2::itsmft::NoiseMap* mDeadChanMap = nullptr;
 
-  ClassDef(Digitizer, 4);
+  bool mUseAPTSResp = false; ///< use APTS response
+
+  ClassDef(Digitizer, 5);
 };
 } // namespace o2::its3
 

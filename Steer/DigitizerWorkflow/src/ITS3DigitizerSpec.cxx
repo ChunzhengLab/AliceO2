@@ -69,6 +69,7 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
   void initDigitizerTask(framework::InitContext& ic) override
   {
     mDisableQED = ic.options().get<bool>("disable-qed");
+    mUseAPTSResponse = ic.options().get<bool>("use-apts-response");
   }
 
   void run(framework::ProcessingContext& pc)
@@ -102,6 +103,7 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
     mDigitizer.setDigits(&mDigits);
     mDigitizer.setROFRecords(&mROFRecords);
     mDigitizer.setMCLabels(&mLabels);
+    mDigitizer.isUseAPTSResponse(mUseAPTSResponse);
 
     // digits are directly put into DPL owned resource
     auto& digitsAccum = pc.outputs().make<std::vector<itsmft::Digit>>(Output{mOrigin, "DIGITS", 0});
@@ -197,6 +199,8 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
     timer.Stop();
     LOG(info) << "Digitization took " << timer.CpuTime() << "s";
 
+    // mDigitizer.saveAndClose();
+
     // we should be only called once; tell DPL that this process is ready to exit
     pc.services().get<ControlService>().readyToQuit(QuitRequest::Me);
 
@@ -272,6 +276,7 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
   bool mWithMCTruth{true};
   bool mFinished{false};
   bool mDisableQED{false};
+  bool mUseAPTSResponse{false};
   const o2::detectors::DetID mID{o2::detectors::DetID::IT3};
   const o2::header::DataOrigin mOrigin{o2::header::gDataOriginIT3};
   o2::its3::Digitizer mDigitizer{};
@@ -289,7 +294,7 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
   o2::parameters::GRPObject::ROMode mROMode = o2::parameters::GRPObject::PRESENT; // readout mode
 };
 
-DataProcessorSpec getITS3DigitizerSpec(int channel, bool mctruth)
+DataProcessorSpec getITS3DigitizerSpec(int channel, bool mctruth)//
 {
   std::string detStr = o2::detectors::DetID::getName(o2::detectors::DetID::IT3);
   auto detOrig = o2::header::gDataOriginIT3;
@@ -303,7 +308,8 @@ DataProcessorSpec getITS3DigitizerSpec(int channel, bool mctruth)
   return DataProcessorSpec{detStr + "Digitizer",
                            inputs, makeOutChannels(detOrig, mctruth),
                            AlgorithmSpec{adaptFromTask<ITS3DPLDigitizerTask>(mctruth)},
-                           Options{{"disable-qed", o2::framework::VariantType::Bool, false, {"disable QED handling"}}}};
+                           Options{{"disable-qed", o2::framework::VariantType::Bool, false, {"disable QED handling"}},
+                                   {"use-apts-response", o2::framework::VariantType::Bool, false, {"use APTS response"}}}};
 }
 
 } // namespace o2::its3
