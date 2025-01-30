@@ -9,16 +9,6 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
-#include "ITS3Base/SegmentationMosaix.h"
-
-ClassImp(o2::its3::SegmentationMosaix);
-
-namespace o2::its3
-{
-
-const std::array<SegmentationMosaix, constants::nLayers> SegmentationsIB{0, 1, 2};
-}
-
 #include "EventVisualisationBase/EveConfParam.h"
 
 O2ParamImpl(o2::event_visualisation::EveConfParam);

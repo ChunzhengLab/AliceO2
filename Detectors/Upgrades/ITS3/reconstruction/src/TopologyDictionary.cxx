@@ -136,7 +136,7 @@ TH1F* TopologyDictionary::getTopologyDistribution(const std::string_view hname) 
 template <typename T>
 math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::CompClusterExt& cl) const
 {
-  static std::array<o2::its3::SegmentationSuperAlpide, 3> mSuperSegmentations{0, 1, 2};
+  static std::array<o2::its3::SegmentationMosaix, 3> SegmentationsIB{0, 1, 2};
   math_utils::Point3D<T> locCl;
   if (!its3::constants::detID::isDetITS3(cl.getSensorID())) {
     o2::itsmft::SegmentationAlpide::detectorToLocalUnchecked(cl.getRow(), cl.getCol(), locCl);
@@ -144,11 +144,11 @@ math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::C
     locCl.SetZ(locCl.Z() + this->getZCOG(cl.getPatternID()) * itsmft::SegmentationAlpide::PitchCol);
   } else {
     auto layer = its3::constants::detID::getDetID2Layer(cl.getSensorID());
-    its3::SegmentationsIB[layer].detectorToLocalUnchecked(cl.getRow(), cl.getCol(), locCl);
-    locCl.SetX(locCl.X() + this->getXCOG(cl.getPatternID()) * its3::SegmentationMosaix::mPitchRow);
-    locCl.SetZ(locCl.Z() + this->getZCOG(cl.getPatternID()) * its3::SegmentationMosaix::mPitchCol);
+    SegmentationsIB[layer].detectorToLocalUnchecked(cl.getRow(), cl.getCol(), locCl);
+    locCl.SetX(locCl.X() + this->getXCOG(cl.getPatternID()) * SegmentationMosaix::mPitchRow);
+    locCl.SetZ(locCl.Z() + this->getZCOG(cl.getPatternID()) * SegmentationMosaix::mPitchCol);
     float xCurved{0.f}, yCurved{0.f};
-    its3::SegmentationsIB[layer].flatToCurved(locCl.X(), locCl.Y(), xCurved, yCurved);
+    SegmentationsIB[layer].flatToCurved(locCl.X(), locCl.Y(), xCurved, yCurved);
     locCl.SetXYZ(xCurved, yCurved, locCl.Z());
   }
   return locCl;
@@ -157,7 +157,7 @@ math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::C
 template <typename T>
 math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::CompClusterExt& cl, const itsmft::ClusterPattern& patt, bool isGroup)
 {
-  static std::array<o2::its3::SegmentationSuperAlpide, 3> mSuperSegmentations{0, 1, 2};
+  static std::array<o2::its3::SegmentationMosaix, 3> SegmentationsIB{0, 1, 2};
   auto refRow = cl.getRow();
   auto refCol = cl.getCol();
   float xCOG = 0, zCOG = 0;
@@ -171,9 +171,9 @@ math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::C
     o2::itsmft::SegmentationAlpide::detectorToLocalUnchecked(refRow + xCOG, refCol + zCOG, locCl);
   } else {
     auto layer = its3::constants::detID::getDetID2Layer(cl.getSensorID());
-    its3::SegmentationsIB[layer].detectorToLocalUnchecked(refRow + xCOG, refCol + zCOG, locCl);
+    SegmentationsIB[layer].detectorToLocalUnchecked(refRow + xCOG, refCol + zCOG, locCl);
     float xCurved{0.f}, yCurved{0.f};
-    its3::SegmentationsIB[layer].flatToCurved(locCl.X(), locCl.Y(), xCurved, yCurved);
+    SegmentationsIB[layer].flatToCurved(locCl.X(), locCl.Y(), xCurved, yCurved);
     locCl.SetXYZ(xCurved, yCurved, locCl.Z());
   }
   return locCl;

@@ -54,12 +54,12 @@ class SegmentationMosaix
   // |           |          |
   // x----------------------x
  public:
-  ~SegmentationSuperAlpide() = default;
-  SegmentationSuperAlpide(const SegmentationSuperAlpide&) = default;
-  SegmentationSuperAlpide(SegmentationSuperAlpide&&) = delete;
-  SegmentationSuperAlpide& operator=(const SegmentationSuperAlpide&) = default;
-  SegmentationSuperAlpide& operator=(SegmentationSuperAlpide&&) = delete;
-  constexpr SegmentationSuperAlpide(int layer) : mLayer{layer} {}
+  virtual ~SegmentationMosaix() = default;
+  SegmentationMosaix(const SegmentationMosaix&) = default;
+  SegmentationMosaix(SegmentationMosaix&&) = delete;
+  SegmentationMosaix& operator=(const SegmentationMosaix&) = delete;
+  SegmentationMosaix& operator=(SegmentationMosaix&&) = delete;
+  constexpr SegmentationMosaix(int layer) : mLayer{layer} {}
 
   static constexpr int mNCols{constants::pixelarray::nCols};
   static constexpr int mNRows{constants::pixelarray::nRows};

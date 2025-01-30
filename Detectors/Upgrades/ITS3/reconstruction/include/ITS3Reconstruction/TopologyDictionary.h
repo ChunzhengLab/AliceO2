@@ -17,7 +17,7 @@
 
 #include "DataFormatsITSMFT/TopologyDictionary.h"
 #include "DataFormatsITSMFT/ClusterPattern.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 
 namespace o2::its3
 {
