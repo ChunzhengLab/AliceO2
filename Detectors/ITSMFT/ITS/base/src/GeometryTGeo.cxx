@@ -24,8 +24,6 @@
 
 #ifdef ENABLE_UPGRADES
 #include "ITS3Base/SpecsV2.h"
-#include "ITS3Base/SegmentationSuperAlpide.h"
-using SuperSegmentation = o2::its3::SegmentationSuperAlpide;
 #endif
 
 #include <TGeoBBox.h>         // for TGeoBBox
@@ -902,13 +900,6 @@ const o2::math_utils::Transform3D GeometryTGeo::getT2LMatrixITS3(int isn, float 
   const TGeoHMatrix& matL2G = getMatrixL2G(isn);
   const auto& matL2Gi = matL2G.Inverse();
   t2l.MultiplyLeft(&matL2Gi);
-  // TODO FS
-  // correction for effective sensor thickness; disabled for now since this does not work
-  // but the bias by not using in this should be very small
-  // static TGeoTranslation tra;
-  // tra.SetDx(SuperSegmentation::mSensorLayerThicknessCorr * std::cos(alpha));
-  // tra.SetDy(SuperSegmentation::mSensorLayerThicknessCorr * std::sin(alpha));
-  // t2l *= tra;
   return Mat3D(t2l);
 }
 
