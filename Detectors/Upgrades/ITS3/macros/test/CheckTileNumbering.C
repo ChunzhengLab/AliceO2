@@ -102,7 +102,7 @@ void CheckTileNumbering(const std::string& inputGeom = "", const std::string& de
   Int_t colors[NRGBs] = {kWhite, kRed, kGray};
   TColor::SetPalette(NRGBs, colors, 1.0);
 
-  std::array<o2::its3::SegmentationSuperAlpide, 3> mSuperSegmentations{0, 1, 2};
+  std::array<its3::SegmentationMosaix, 3> SegmentationsIB{0, 1, 2};
 
   const float phiOffsetL0 = std::asin(o2::its3::constants::equatorialGap / 2.f / o2::its3::constants::radii[0]);
   const float phiOffsetL1 = std::asin(o2::its3::constants::equatorialGap / 2.f / o2::its3::constants::radii[1]);

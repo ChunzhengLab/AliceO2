@@ -97,7 +97,7 @@ void CompareClustersAndDigits(std::string clusfile = "o2clus_it3.root",
   std::vector<HitVec*> hitVecPool;
   std::vector<MC2HITS_map> mc2hitVec;
 
-  std::array<o2::its3::SegmentationSuperAlpide, 3> mSuperSegmentations{0, 1, 2};
+  std::array<its3::SegmentationMosaix, 3> SegmentationsIB{0, 1, 2};
 
   // Geometry
   o2::base::GeometryManager::loadGeometry(inputGeom);

@@ -56,7 +56,7 @@ void CheckMosaixSegment(bool isTestDetectorToLocal = false,
   static constexpr unsigned int mNCols{SegmentationMosaix::mNCols};
   static constexpr unsigned int mNRows{SegmentationMosaix::mNRows};
   static constexpr unsigned int nPixels{mNCols * mNRows};
-  std::array<SegmentationSuperAlpide, 3> mSuperSegmentations{0, 1, 2};
+  std::array<SegmentationMosaix, 3> SegmentationsIB{0, 1, 2};
 
   if (isTestDetectorToLocal || isTestFlatToCurved) {
     namespace cp = constants::pixelarray;
