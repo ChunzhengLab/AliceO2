@@ -96,7 +96,7 @@ class DigiParams
   const SignalShape& getSignalShape() const { return mSignalShape; }
   SignalShape& getSignalShape() { return (SignalShape&)mSignalShape; }
 
-  void print() const;
+  virtual void print() const;
 
  private:
   static constexpr double infTime = 1e99;
