@@ -198,6 +198,7 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
 
     timer.Stop();
     LOG(info) << "Digitization took " << timer.CpuTime() << "s";
+    mDigitizer.saveAndClose();
 
     // we should be only called once; tell DPL that this process is ready to exit
     pc.services().get<ControlService>().readyToQuit(QuitRequest::Me);

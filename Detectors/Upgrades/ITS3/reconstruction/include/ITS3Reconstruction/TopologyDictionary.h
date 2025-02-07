@@ -47,6 +47,8 @@ class TopologyDictionary
 
   int readFromFile(const std::string& fileName);
 
+  static constexpr double shiftYFlat = 0.; ///< Shift in the y direction for the flat to curved transformation 10um = 10e-4 cm
+
   /// Returns the x position of the COG for the n_th element
   inline float getXCOG(int n) const
   {

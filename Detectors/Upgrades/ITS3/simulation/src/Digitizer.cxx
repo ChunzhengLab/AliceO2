@@ -74,6 +74,35 @@ void Digitizer::init()
   }
   mParams.print();
   mIRFirstSampledTF = o2::raw::HBFUtils::Instance().getFirstSampledTFIR();
+
+  if (!outfile_hit_info) {
+    outfile_hit_info = new TFile("hit_info.root", "RECREATE");
+    tree_hit_info = new TTree("tree_hit_info", "Hit Information");
+    tree_hit_info->Branch("layer", &data.layer);
+    tree_hit_info->Branch("chipID", &data.chipID);
+    tree_hit_info->Branch("xGloSta", &data.xGloSta);
+    tree_hit_info->Branch("yGloSta", &data.yGloSta);
+    tree_hit_info->Branch("zGloSta", &data.zGloSta);
+    tree_hit_info->Branch("xGloEnd", &data.xGloEnd);
+    tree_hit_info->Branch("yGloEnd", &data.yGloEnd);
+    tree_hit_info->Branch("zGloEnd", &data.zGloEnd);
+    tree_hit_info->Branch("xLocSta", &data.xLocSta);
+    tree_hit_info->Branch("yLocSta", &data.yLocSta);
+    tree_hit_info->Branch("zLocSta", &data.zLocSta);
+    tree_hit_info->Branch("xLocEnd", &data.xLocEnd);
+    tree_hit_info->Branch("yLocEnd", &data.yLocEnd);
+    tree_hit_info->Branch("zLocEnd", &data.zLocEnd);
+    tree_hit_info->Branch("xFlaSta", &data.xFlaSta);
+    tree_hit_info->Branch("yFlaSta", &data.yFlaSta);
+    tree_hit_info->Branch("zFlaSta", &data.zFlaSta);
+    tree_hit_info->Branch("xFlaEnd", &data.xFlaEnd);
+    tree_hit_info->Branch("yFlaEnd", &data.yFlaEnd);
+    tree_hit_info->Branch("zFlaEnd", &data.zFlaEnd);
+    tree_hit_info->Branch("depDepoX", &data.depDepoX);
+    tree_hit_info->Branch("depDepoY", &data.depDepoY);
+    tree_hit_info->Branch("depDepoZ", &data.depDepoZ);
+    tree_hit_info->Branch("depDepoElectrons", &data.depDepoElectrons);
+  }
 }
 
 void Digitizer::process(const std::vector<itsmft::Hit>* hits, int evID, int srcID)
@@ -212,6 +241,12 @@ void Digitizer::fillOutputContainer(uint32_t frameLast)
 
 void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID, int srcID)
 {
+  // 清空存储电荷沉积位置的数据（如果有）
+  std::vector<double>().swap(data.depDepoX);
+  std::vector<double>().swap(data.depDepoY);
+  std::vector<double>().swap(data.depDepoZ);
+  std::vector<int>().swap(data.depDepoElectrons);
+
   static std::array<o2::its3::SegmentationMosaix, 3> SegmentationsIB{0, 1, 2};
   // convert single hit to digits
   int chipID = hit.GetDetectorID();
@@ -247,11 +282,19 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     maxFr = roFrameMax; // if signal extends beyond current maxFrame, increase the latter
   }
 
-  // here we start stepping in the depth of the sensor to generate charge diffision
+  // 仿真步数相关设置
   float nStepsInv = mParams.getNSimStepsInv();
   int nSteps = mParams.getNSimSteps();
-  int detID{hit.GetDetectorID()};
+  // 将总电子数计算出来，再均分到每一步（这里 nElectrons 表示每步的注入电子数）
+  float nElectrons = hit.GetEnergyLoss() * mParams.getEnergyToNElectrons();
+  nElectrons *= nStepsInv;
+
+  int detID = hit.GetDetectorID();
   int layer = mGeometry->getLayer(detID);
+
+  data.chipID = detID;
+  data.layer = layer;
+
   const auto& matrix = mGeometry->getMatrixL2G(detID);
   bool innerBarrel{layer < 3};
   math_utils::Vector3D<float> xyzLocS, xyzLocE;
@@ -265,15 +308,20 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     // update the local coordinates with the flattened ones
     xyzLocS.SetXYZ(xFlatS, yFlatS, xyzLocS.Z());
     xyzLocE.SetXYZ(xFlatE, yFlatE, xyzLocE.Z());
+    data.xFlaSta = xFlatS;
+    data.yFlaSta = yFlatS;
+    data.xFlaEnd = xFlatE;
+    data.yFlaEnd = yFlatE;
   }
 
-  math_utils::Vector3D<float> step(xyzLocE);
+  // 计算模拟步长
+  math_utils::Vector3D<float> step = xyzLocE;
   step -= xyzLocS;
-  step *= nStepsInv; // position increment at each step
-  // the electrons will be injected in the middle of each step
-  math_utils::Vector3D<float> stepH(step * 0.5);
-  xyzLocS += stepH; // Adjust start position to the middle of the first step
-  xyzLocE -= stepH; // Adjust end position to the middle of the last step
+  step *= nStepsInv;
+  math_utils::Vector3D<float> stepH = step * 0.5;
+  xyzLocS += stepH;
+  xyzLocE -= stepH;
+
   int rowS = -1, colS = -1, rowE = -1, colE = -1, nSkip = 0;
   if (innerBarrel) {
     // get entrance pixel row and col
@@ -337,109 +385,111 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
   float respMatrix[rowSpan][colSpan];                       // response accumulated here
   std::fill(&respMatrix[0][0], &respMatrix[0][0] + rowSpan * colSpan, 0.f);
 
-  float nElectrons = hit.GetEnergyLoss() * mParams.getEnergyToNElectrons(); // total number of deposited electrons
-  nElectrons *= nStepsInv;                                                  // N electrons injected per step
-  if (nSkip != 0) {
-    nSteps -= nSkip;
-  }
-  //
   int rowPrev = -1, colPrev = -1, row, col;
-  float cRowPix = 0.f, cColPix = 0.f; // NOTE: local coordinated of the current pixel center，像素中心的坐标！！！
-
-  // take into account that the AlpideSimResponse depth defintion has different min/max boundaries
-  // although the max should coincide with the surface of the epitaxial layer, which in the chip
-  // local coordinates has Y = +SensorLayerThickness/2
+  float cRowPix = 0.f, cColPix = 0.f;
   float thickness = innerBarrel ? SegmentationIB::mSensorLayerThickness : SegmentationOB::SensorLayerThickness;
   float depth_shift = -thickness / 2.;
   if (innerBarrel && mUseAPTSResp) {
-    depth_shift = -10.e-4; // depth in the APTS response = depth in the simulation(Y) - 10um)
+    depth_shift = -20.e-4;
+    // depth_shift = 0.;
   }
-
-  if(innerBarrel) {
+  if (innerBarrel) {
     xyzLocS.SetY(xyzLocS.Y() + mIBSimResp->getDepthMax() + depth_shift);
   } else {
     xyzLocS.SetY(xyzLocS.Y() + mOBSimResp->getDepthMax() + depth_shift);
   }
 
-  // collect charge in evey pixel which might be affected by the hit
+  std::vector<std::vector<int>> digitAccumulator(rowSpan, std::vector<int>(colSpan, 0));
+  // 对每个模拟步进行处理，每一步直接进行 Poisson 抽样并累加
   for (int iStep = nSteps; iStep--;) {
-    // Get the pixel ID
+    // 获取当前子步所在的像素编号
     if (innerBarrel) {
       SegmentationsIB[layer].localToDetector(xyzLocS.X(), xyzLocS.Z(), row, col);
     } else {
       SegmentationOB::localToDetector(xyzLocS.X(), xyzLocS.Z(), row, col);
     }
-    if (row != rowPrev || col != colPrev) { // update pixel and coordinates of its center //确定是不是进入了新的pixel
+    if (row != rowPrev || col != colPrev) {
       if (innerBarrel) {
-        if (!SegmentationsIB[layer].detectorToLocal(row, col, cRowPix, cColPix)) {
-          continue;
-        }
+        if (!SegmentationsIB[layer].detectorToLocal(row, col, cRowPix, cColPix))
+        continue;
       } else if (!SegmentationOB::detectorToLocal(row, col, cRowPix, cColPix)) {
-        continue; // should not happen
+        continue;
       }
       rowPrev = row;
       colPrev = col;
     }
     bool flipCol = false, flipRow = false;
-    // note that response needs coordinates along column row (locX) (locZ) then depth (locY)
-    double rowMax{0.5f * (innerBarrel ? SegmentationIB::mPitchRow : SegmentationOB::PitchRow)};
-    double colMax{0.5f * (innerBarrel ? SegmentationIB::mPitchCol : SegmentationOB::PitchCol)};
-
-    double scale_x{1.};
-    double scale_y{1.};
-
+    double rowMaxVal = 0.5 * (innerBarrel ? SegmentationIB::mPitchRow : SegmentationOB::PitchRow);
+    double colMaxVal = 0.5 * (innerBarrel ? SegmentationIB::mPitchCol : SegmentationOB::PitchCol);
+    double scale_x = 1.0, scale_y = 1.0;
     if (mUseAPTSResp) {
-      scale_x = 0.5 * constants::extrainfo::aptsPitchX / rowMax;
-      scale_y = 0.5 * constants::extrainfo::aptsPitchY / colMax;
+      scale_x = 0.5 * constants::extrainfo::aptsPitchX / rowMaxVal;
+      scale_y = 0.5 * constants::extrainfo::aptsPitchY / colMaxVal;
     }
-
     const AlpideRespSimMat* rspmat = nullptr;
     if (innerBarrel) {
-      rspmat = mIBSimResp->getResponse(scale_x * (xyzLocS.X() - cRowPix), scale_y * (xyzLocS.Z() - cColPix), xyzLocS.Y(), flipRow, flipCol, rowMax, colMax);
-      // std::cout<<(xyzLocS.X() - cRowPix)<<" scale to "<<(xyzLocS.X() - cRowPix) * scale_x<<std::endl;
+      rspmat = mIBSimResp->getResponse(scale_x * (xyzLocS.X() - cRowPix),
+                                        scale_y * (xyzLocS.Z() - cColPix),
+                                        xyzLocS.Y(), flipRow, flipCol, rowMaxVal, colMaxVal);
     } else {
-      rspmat = mOBSimResp->getResponse(xyzLocS.X() - cRowPix, xyzLocS.Z() - cColPix, xyzLocS.Y(), flipRow, flipCol, rowMax, colMax); // for the outer barrel, don't need to scale
+      rspmat = mOBSimResp->getResponse(xyzLocS.X() - cRowPix,
+                                       xyzLocS.Z() - cColPix,
+                                       xyzLocS.Y(), flipRow, flipCol, rowMaxVal, colMaxVal);
     }
-
-    xyzLocS += step;
+    
+    // 保存当前子步的电荷沉积坐标（如果需要调试或后续分析）
+    data.depDepoX.push_back(xyzLocS.X());
+    data.depDepoY.push_back(xyzLocS.Y() - depth_shift - (innerBarrel ? mIBSimResp->getDepthMax() : mOBSimResp->getDepthMax()));
+    data.depDepoZ.push_back(xyzLocS.Z());
+    
+    // 更新位置到下一子步
+    xyzLocS += step; 
     if (rspmat == nullptr) {
+      data.depDepoElectrons.push_back(-1);
       continue;
     }
 
-    for (int irow = AlpideRespSimMat::NPix; irow--;) {
-      int rowDest = row + irow - AlpideRespSimMat::NPix / 2 - rowS; // destination row in the respMatrix
-      if (rowDest < 0 || rowDest >= rowSpan) {
-        continue;
+    // 对局部响应矩阵的每个元素独立抽样
+    for (int irow_local = 0; irow_local < AlpideRespSimMat::NPix; ++irow_local) {
+      int rowDest = row + irow_local - AlpideRespSimMat::NPix / 2 - rowS;
+      if (rowDest < 0 || rowDest >= rowSpan) continue;
+      for (int icol_local = 0; icol_local < AlpideRespSimMat::NPix; ++icol_local) {
+        int colDest = col + icol_local - AlpideRespSimMat::NPix / 2 - colS;
+        if (colDest < 0 || colDest >= colSpan) continue;
+        float localResponse = rspmat->getValue(irow_local, icol_local, flipRow, flipCol);
+        // 对当前步的这部分贡献进行 Poisson 抽样
+        int nEleStep = gRandom->Poisson(nElectrons * localResponse);
+        digitAccumulator[rowDest][colDest] += nEleStep;
       }
-      for (int icol = AlpideRespSimMat::NPix; icol--;) {
-        int colDest = col + icol - AlpideRespSimMat::NPix / 2 - colS; // destination column in the respMatrix
-        if (colDest < 0 || colDest >= colSpan) {
-          continue;
+    }
+
+    //提取电子数最大的像素
+    int maxEle = 0;
+    for (int i = 0; i < rowSpan; ++i) {
+      for (int j = 0; j < colSpan; ++j) {
+        if (digitAccumulator[i][j] > maxEle) {
+          maxEle = digitAccumulator[i][j];
         }
-        respMatrix[rowDest][colDest] += rspmat->getValue(irow, icol, flipRow, flipCol);
       }
+    }
+    data.depDepoElectrons.push_back(maxEle);
+  }
+
+  // 将各像素上累加的电子数（digitAccumulator）转换成最终的 digit
+  o2::MCCompLabel lbl(hit.GetTrackID(), evID, srcID, false);
+  auto roFrameAbs = mNewROFrame + roFrameRel;
+  for (int i = 0; i < rowSpan; ++i) {
+    uint16_t rowIS = i + rowS;
+    for (int j = 0; j < colSpan; ++j) {
+      int totalEle = digitAccumulator[i][j];
+      if (totalEle < mParams.getMinChargeToAccount())
+        continue;
+      uint16_t colIS = j + colS;
+      registerDigits(chip, roFrameAbs, timeInROF, nFrames, rowIS, colIS, totalEle, lbl);
     }
   }
 
-  // fire the pixels assuming Poisson(n_response_electrons)
-  o2::MCCompLabel lbl(hit.GetTrackID(), evID, srcID, false);
-  auto roFrameAbs = mNewROFrame + roFrameRel;
-  for (int irow = rowSpan; irow--;) {
-    uint16_t rowIS = irow + rowS;
-    for (int icol = colSpan; icol--;) {
-      float nEleResp = respMatrix[irow][icol];
-      if (nEleResp <= 1.e-36) {
-        continue;
-      }
-      int nEle = gRandom->Poisson(nElectrons * nEleResp); // total charge in given pixel
-      // ignore charge which have no chance to fire the pixel
-      if (nEle < mParams.getMinChargeToAccount()) {
-        continue;
-      }
-      uint16_t colIS = icol + colS;
-      registerDigits(chip, roFrameAbs, timeInROF, nFrames, rowIS, colIS, nEle, lbl);
-    }
-  }
+  tree_hit_info->Fill();
 }
 
 void Digitizer::registerDigits(o2::itsmft::ChipDigitsContainer& chip, uint32_t roFrame, float tInROF, int nROF,

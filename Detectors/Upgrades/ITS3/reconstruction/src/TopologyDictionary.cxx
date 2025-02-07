@@ -148,7 +148,6 @@ math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::C
     locCl.SetX(locCl.X() + this->getXCOG(cl.getPatternID()) * SegmentationMosaix::mPitchRow);
     locCl.SetZ(locCl.Z() + this->getZCOG(cl.getPatternID()) * SegmentationMosaix::mPitchCol);
     float xCurved{0.f}, yCurved{0.f};
-    double shiftYFlat = +13.58e-4;
     SegmentationsIB[layer].flatToCurved(locCl.X(), locCl.Y() + shiftYFlat, xCurved, yCurved);
     locCl.SetXYZ(xCurved, yCurved, locCl.Z());
   }
@@ -174,7 +173,6 @@ math_utils::Point3D<T> TopologyDictionary::getClusterCoordinates(const itsmft::C
     auto layer = its3::constants::detID::getDetID2Layer(cl.getSensorID());
     SegmentationsIB[layer].detectorToLocalUnchecked(refRow + xCOG, refCol + zCOG, locCl);
     float xCurved{0.f}, yCurved{0.f};
-    double shiftYFlat = +13.58e-4;
     SegmentationsIB[layer].flatToCurved(locCl.X(), locCl.Y() + shiftYFlat, xCurved, yCurved);
     locCl.SetXYZ(xCurved, yCurved, locCl.Z());
   }

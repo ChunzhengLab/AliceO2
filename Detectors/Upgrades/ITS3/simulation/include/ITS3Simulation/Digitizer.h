@@ -21,6 +21,9 @@
 #include "Rtypes.h"  // for Digitizer::Class
 #include "TObject.h" // for TObject
 
+#include "TFile.h"
+#include "TNtuple.h"
+
 #include "ITSMFTSimulation/ChipDigitsContainer.h"
 #include "ITSMFTSimulation/AlpideSimResponse.h"
 #include "ITS3Simulation/DigiParams.h"
@@ -80,6 +83,17 @@ class Digitizer : public TObject
 
   void isUseAPTSResponse(bool v) { mUseAPTSResp = v; }
 
+  void saveAndClose() {
+    if (outfile_hit_info && tree_hit_info) {
+        outfile_hit_info->cd();
+        tree_hit_info->Write(); // 显式写入 ROOT 文件
+        outfile_hit_info->Close();
+        delete outfile_hit_info;
+        outfile_hit_info = nullptr;
+        tree_hit_info = nullptr;
+    }
+  }
+
  private:
   void processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID, int srcID);
   void registerDigits(o2::itsmft::ChipDigitsContainer& chip, uint32_t roFrame, float tInROF, int nROF,
@@ -125,6 +139,24 @@ class Digitizer : public TObject
   const o2::itsmft::NoiseMap* mDeadChanMap = nullptr;
 
   bool mUseAPTSResp = false; ///< use APTS response
+
+  TFile* outfile_hit_info = nullptr;
+  TTree* tree_hit_info = nullptr;
+
+  struct Data {
+    int layer;
+    int chipID;
+    double xGloSta{0}, yGloSta{0}, zGloSta{0};
+    double xGloEnd{0}, yGloEnd{0}, zGloEnd{0};
+    double xLocSta{0}, yLocSta{0}, zLocSta{0};
+    double xLocEnd{0}, yLocEnd{0}, zLocEnd{0};
+    double xFlaSta{0}, yFlaSta{0}, zFlaSta{0};
+    double xFlaEnd{0}, yFlaEnd{0}, zFlaEnd{0};
+    std::vector<double> depDepoX;
+    std::vector<double> depDepoY;
+    std::vector<double> depDepoZ;
+    std::vector<int> depDepoElectrons;
+  } data;
 
   ClassDef(Digitizer, 5);
 };
