@@ -139,6 +139,10 @@ class Digitizer : public TObject
   const o2::itsmft::NoiseMap* mDeadChanMap = nullptr;
 
   bool mUseAPTSResp = false; ///< use APTS response
+  double mRespDepthShiftIB = 0; ///< flat depth shift for all hits
+  double mRespDepthShiftOB = 0; ///< flat depth shift for all hits
+  double mScalePixelX = 1.0;
+  double mScalePixelY = 1.0;
 
   TFile* outfile_hit_info = nullptr;
   TTree* tree_hit_info = nullptr;

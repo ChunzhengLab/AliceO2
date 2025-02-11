@@ -295,7 +295,7 @@ void ITS3Layer::createCarbonForm()
   mCarbonForm->VisibleDaughters();
   double dRadius = -1;
   if (mNLayer < 2) {
-    dRadius = constants::radii[mNLayer + 1] - constants::radii[mNLayer] - constants::thickness;
+    dRadius = constants::radii[mNLayer + 1] - constants::radii[mNLayer] - constants::totalThickness;
   } else {
     dRadius = 0.7; // TODO: lack of carbon foam radius for layer 2, use 0.7mm as a temporary value
   }

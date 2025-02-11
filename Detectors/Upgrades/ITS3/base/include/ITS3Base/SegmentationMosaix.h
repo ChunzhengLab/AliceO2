@@ -68,10 +68,10 @@ class SegmentationMosaix
   static constexpr float mWidth{constants::pixelarray::width};
   static constexpr float mPitchCol{constants::pixelarray::length / static_cast<float>(mNCols)};
   static constexpr float mPitchRow{constants::pixelarray::width / static_cast<float>(mNRows)};
-  static constexpr float mSensorLayerThickness{constants::thickness};
-  static constexpr float mSensorLayerThicknessEff{constants::effThickness};
-  static constexpr float mSensorLayerThicknessCorr{constants::corrThickness};
-  static constexpr std::array<float, constants::nLayers> mRadii{constants::radii};
+  // static constexpr float mSensorLayerThickness{constants::thickness};
+  // static constexpr float mSensorLayerThicknessEff{constants::effThickness};
+  // static constexpr float mSensorLayerThicknessCorr{constants::corrThickness};
+  static constexpr std::array<double, constants::nLayers> mRadii{constants::radii};
 
   /// Transformation from the curved surface to a flat surface
   /// \param xCurved Detector local curved coordinate x in cm with respect to

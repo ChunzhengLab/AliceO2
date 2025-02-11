@@ -72,6 +72,13 @@ void Digitizer::init()
       LOG(error) << "Failed to load OB response from file: " << responseFileOB;
       throw std::runtime_error("Failed to load OB response from file");
     }
+    mRespDepthShiftIB = mIBSimResp->getDepthMax() - constants::silicon::thicknessOut;
+    mRespDepthShiftOB = mOBSimResp->getDepthMax() - SegmentationOB::SensorLayerThickness / 2;
+    
+    if (mUseAPTSResp) {
+      mScalePixelX = constants::pixelarray::pixels::apts::pitchX / constants::pixelarray::pixels::mosaix::pitchX;
+      mScalePixelY = constants::pixelarray::pixels::apts::pitchZ / constants::pixelarray::pixels::mosaix::pitchZ;
+    }
     mParams.setIBSimResponse(mIBSimResp);
     mParams.setOBSimResponse(mOBSimResp);
   }
@@ -390,16 +397,16 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
 
   int rowPrev = -1, colPrev = -1, row, col;
   float cRowPix = 0.f, cColPix = 0.f;
-  float thickness = innerBarrel ? SegmentationIB::mSensorLayerThickness : SegmentationOB::SensorLayerThickness;
-  float depth_shift = -thickness / 2.;
-  if (innerBarrel && mUseAPTSResp) {
-    depth_shift = -20.e-4;
-    // depth_shift = 0.;
-  }
+  // float thickness = innerBarrel ? SegmentationIB::mSensorLayerThickness : SegmentationOB::SensorLayerThickness;
+  // float depth_shift = -thickness / 2.;
+  // if (innerBarrel && mUseAPTSResp) {
+  //   depth_shift = -20.e-4;
+  //   // depth_shift = 0.;
+  // }
   if (innerBarrel) {
-    xyzLocS.SetY(xyzLocS.Y() + mIBSimResp->getDepthMax() + depth_shift);
+    xyzLocS.SetY(xyzLocS.Y() + mRespDepthShiftIB);
   } else {
-    xyzLocS.SetY(xyzLocS.Y() + mOBSimResp->getDepthMax() + depth_shift);
+    xyzLocS.SetY(xyzLocS.Y() + mRespDepthShiftOB);
   }
 
   std::vector<std::vector<int>> digitAccumulator(rowSpan, std::vector<int>(colSpan, 0));
@@ -422,18 +429,13 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
       colPrev = col;
     }
     bool flipCol = false, flipRow = false;
-    double rowMaxVal = 0.5 * (innerBarrel ? SegmentationIB::mPitchRow : SegmentationOB::PitchRow);
-    double colMaxVal = 0.5 * (innerBarrel ? SegmentationIB::mPitchCol : SegmentationOB::PitchCol);
-    double scale_x = 1.0, scale_y = 1.0;
-    if (mUseAPTSResp) {
-      scale_x = 0.5 * constants::extrainfo::aptsPitchX / rowMaxVal;
-      scale_y = 0.5 * constants::extrainfo::aptsPitchY / colMaxVal;
-    }
+    // double rowMaxVal = 0.5 * (innerBarrel ? SegmentationIB::mPitchRow : SegmentationOB::PitchRow);
+    // double colMaxVal = 0.5 * (innerBarrel ? SegmentationIB::mPitchCol : SegmentationOB::PitchCol);
     const AlpideRespSimMat* rspmat = nullptr;
     if (innerBarrel) {
-      rspmat = mIBSimResp->getResponse(scale_x * (xyzLocS.X() - cRowPix),
-                                        scale_y * (xyzLocS.Z() - cColPix),
-                                        xyzLocS.Y(), flipRow, flipCol, rowMaxVal, colMaxVal);
+      rspmat = mIBSimResp->getResponse(mScalePixelX * (xyzLocS.X() - cRowPix),
+                                       mScalePixelY * (xyzLocS.Z() - cColPix),
+                                       xyzLocS.Y(), flipRow, flipCol, SegmentationIB::mPitchRow/2.,  SegmentationIB::mPitchCol/2.);
       // check depth and middle of rspmat
       // if(rspmat != nullptr && (abs(xyzLocS.X() - cRowPix) < 0.1 * 1.e-4) && (abs(xyzLocS.Z() - cColPix) < 0.1 * 1.e-4)) {
       // // if(rspmat != nullptr){
@@ -442,12 +444,13 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     } else {
       rspmat = mOBSimResp->getResponse(xyzLocS.X() - cRowPix,
                                        xyzLocS.Z() - cColPix,
-                                       xyzLocS.Y(), flipRow, flipCol, rowMaxVal, colMaxVal);
+                                       xyzLocS.Y(), flipRow, flipCol, SegmentationOB::PitchRow/2., SegmentationOB::PitchCol/2.);
     }
     
     // 保存当前子步的电荷沉积坐标（如果需要调试或后续分析）
     data.depDepoX.push_back(xyzLocS.X());
-    data.depDepoY.push_back(xyzLocS.Y() - depth_shift - (innerBarrel ? mIBSimResp->getDepthMax() : mOBSimResp->getDepthMax()));
+    //data.depDepoY.push_back(xyzLocS.Y() - depth_shift - (innerBarrel ? mIBSimResp->getDepthMax() : mOBSimResp->getDepthMax()));
+    data.depDepoY.push_back(xyzLocS.Y() - (innerBarrel ? mRespDepthShiftIB : mRespDepthShiftOB));
     data.depDepoZ.push_back(xyzLocS.Z());
     
     // 更新位置到下一子步
@@ -464,7 +467,7 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
       for (int icol_local = 0; icol_local < AlpideRespSimMat::NPix; ++icol_local) {
         int colDest = col + icol_local - AlpideRespSimMat::NPix / 2 - colS;
         if (colDest < 0 || colDest >= colSpan) continue;
-        float localResponse = rspmat->getValue(irow_local, icol_local, innerBarrel ^ flipRow, flipCol);
+        float localResponse = rspmat->getValue(irow_local, icol_local, (mUseAPTSResp && innerBarrel) ^ flipRow, flipCol); // 对于APTS做IB，要在flipRow前取反
         // 对当前步的这部分贡献进行 Poisson 抽样
         int nEleStep = gRandom->Poisson(nElectrons * localResponse);
         digitAccumulator[rowDest][colDest] += nEleStep;
