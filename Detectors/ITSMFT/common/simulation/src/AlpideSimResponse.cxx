@@ -106,8 +106,11 @@ void AlpideSimResponse::initData(int tableNumber, std::string dataPath, const bo
   float val, gx, gy, gz;
   int lost, untrck, dead, nele;
   size_t dataSize = 0;
+  float sumRespWeighted = 0.f;
+  float sumRespWeights  = 0.f;
   mDptMax = -2.e9;
   mDptMin = 2.e9;
+  mRespCentre = 0.f;
   const int npix = AlpideRespSimMat::getNPix();
 
   for (int ix = 0; ix < mNBinCol; ix++) {
@@ -140,12 +143,11 @@ void AlpideSimResponse::initData(int tableNumber, std::string dataPath, const bo
         inpGrid >> lost >> dead >> untrck >> nele >> gx >> gy >> gz;
 
         if (inpGrid.bad()) {
-          LOG(fatal) << "Failed reading data for depth(Z) slice " << iz << " from "
-                     << inpfname;
+          LOG(fatal) << "Failed reading data for depth(Z) slice " << iz << " from " << inpfname;
         }
         if (!nele) {
-          LOG(fatal) << "Wrong normalization Nele=" << nele << "for  depth(Z) slice "
-                     << iz << " from " << inpfname;
+          LOG(fatal) << "Wrong normalization Nele=" << nele << " for depth(Z) slice " << iz
+                     << " from " << inpfname;
         }
 
         if (mDptMax < -1e9) {
@@ -160,8 +162,17 @@ void AlpideSimResponse::initData(int tableNumber, std::string dataPath, const bo
         for (int ip = npix * npix; ip--;) {
           (*arr)[ip] *= norm;
         }
-        mData.push_back(mat); // store in the final container
-      }                       // loop over z
+
+        // pixel centre
+        if (ix == 0 && iy == 0) {
+          int centerIndex = (npix / 2) * npix + (npix / 2);
+          float centerValue = (*arr)[centerIndex];
+          sumRespWeighted += centerValue * gz;
+          sumRespWeights  += centerValue;
+        }
+
+        mData.push_back(mat);
+      }
 
       inpGrid.close();
 
@@ -174,7 +185,12 @@ void AlpideSimResponse::initData(int tableNumber, std::string dataPath, const bo
                << " number of bins";
   }
 
-  // normalize Dpt boundaries
+  if (abs(sumRespWeights) > 1.e-6) {
+    mRespCentre = sumRespWeighted / sumRespWeights;
+  } else {
+    mRespCentre = 0.f;
+    LOG(error) << "Center pixel value sum is zero, cannot compute mRespCentre!";
+  }
 
   mStepInvCol /= micron2cm;
   mStepInvRow /= micron2cm;
@@ -198,9 +214,10 @@ void AlpideSimResponse::print() const
    */
   printf("Alpide response object of %zu matrices to map chagre in xyz to %dx%d pixels\n",
          mData.size(), getNPix(), getNPix());
-  printf("X(col) range: %+e : %+e (cm)| step: %e | Nbins: %d\n", 0.f, mColMax, 1.f / mStepInvCol, mNBinCol);
-  printf("Y(row) range: %+e : %+e (cm)| step: %e | Nbins: %d\n", 0.f, mRowMax, 1.f / mStepInvRow, mNBinRow);
-  printf("Z(dpt) range: %+e : %+e (cm)| step: %e | Nbins: %d\n", mDptMin, mDptMax, 1.f / mStepInvDpt, mNBinDpt);
+  printf("X(col) range: %+e : %+e (cm)| step: %e (cm)| Nbins: %d\n", 0.f, mColMax, 1.f / mStepInvCol, mNBinCol);
+  printf("Y(row) range: %+e : %+e (cm)| step: %e (cm)| Nbins: %d\n", 0.f, mRowMax, 1.f / mStepInvRow, mNBinRow);
+  printf("Z(dpt) range: %+e : %+e (cm)| step: %e (cm)| Nbins: %d\n", mDptMin, mDptMax, 1.f / mStepInvDpt, mNBinDpt);
+  printf("Depth centre of the response : %+e (um)\n", mRespCentre);
 }
 
 //-----------------------------------------------------

@@ -107,6 +107,7 @@ class AlpideSimResponse
   float mStepInvCol = 0;                              /// inverse step of the Col grid
   float mStepInvRow = 0;                              /// inverse step of the Row grid
   float mStepInvDpt = 0;                              /// inverse step of the Dpt grid
+  float mRespCentre = 0;                              /// center of the response matrix
   std::vector<AlpideRespSimMat> mData;                /// response data
   /// path to look for data file
   std::string mDataPath;
@@ -135,6 +136,7 @@ class AlpideSimResponse
   float getStepCol() const { return mStepInvCol ? 1. / mStepInvCol : 0.f; }
   float getStepRow() const { return mStepInvRow ? 1. / mStepInvRow : 0.f; }
   float getStepDepth() const { return mStepInvDpt ? 1. / mStepInvDpt : 0.f; }
+  float getRespCentre() const { return mRespCentre; }
   void setDataPath(const std::string pth) { mDataPath = pth; }
   void setGridColName(const std::string nm) { mGridColName = nm; }
   void setGridRowName(const std::string nm) { mGridRowName = nm; }
