@@ -198,9 +198,9 @@ void AlpideSimResponse::print() const
    */
   printf("Alpide response object of %zu matrices to map chagre in xyz to %dx%d pixels\n",
          mData.size(), getNPix(), getNPix());
-  printf("X(col) range: %+e : %+e | step: %e | Nbins: %d\n", 0.f, mColMax, 1.f / mStepInvCol, mNBinCol);
-  printf("Y(row) range: %+e : %+e | step: %e | Nbins: %d\n", 0.f, mRowMax, 1.f / mStepInvRow, mNBinRow);
-  printf("Z(dpt) range: %+e : %+e | step: %e | Nbins: %d\n", mDptMin, mDptMax, 1.f / mStepInvDpt, mNBinDpt);
+  printf("X(col) range: %+e : %+e (cm)| step: %e | Nbins: %d\n", 0.f, mColMax, 1.f / mStepInvCol, mNBinCol);
+  printf("Y(row) range: %+e : %+e (cm)| step: %e | Nbins: %d\n", 0.f, mRowMax, 1.f / mStepInvRow, mNBinRow);
+  printf("Z(dpt) range: %+e : %+e (cm)| step: %e | Nbins: %d\n", mDptMin, mDptMax, 1.f / mStepInvDpt, mNBinDpt);
 }
 
 //-----------------------------------------------------

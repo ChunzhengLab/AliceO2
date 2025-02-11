@@ -103,7 +103,10 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
     mDigitizer.setDigits(&mDigits);
     mDigitizer.setROFRecords(&mROFRecords);
     mDigitizer.setMCLabels(&mLabels);
-    mDigitizer.isUseAPTSResponse(mUseAPTSResponse);
+
+    std::cout<<"======================================"<<std::endl;
+    std::cout<<"mUseAPTSResponse: "<<mUseAPTSResponse<<std::endl;
+    std::cout<<"======================================"<<std::endl;
 
     // digits are directly put into DPL owned resource
     auto& digitsAccum = pc.outputs().make<std::vector<itsmft::Digit>>(Output{mOrigin, "DIGITS", 0});
@@ -249,6 +252,8 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
       if (o2::its3::ITS3Params::Instance().useDeadChannelMap) {
         pc.inputs().get<o2::itsmft::NoiseMap*>("IT3_dead"); // trigger final ccdb update
       }
+
+      mDigitizer.isUseAPTSResponse(mUseAPTSResponse);
 
       // init digitizer
       mDigitizer.init();

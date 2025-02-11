@@ -53,6 +53,9 @@ void Digitizer::init()
     auto fileOB = TFile::Open(responseFileOB.data());
 
     std::string responseFileIB = responseFileALPIDE;
+    std::cout<<"======================================"<<std::endl;
+    std::cout<<"mUseAPTSResp: "<<mUseAPTSResp<<std::endl;
+    std::cout<<"======================================"<<std::endl;
     if(mUseAPTSResp) {
       responseFileIB = responseFileAPTS;
     }
@@ -431,6 +434,11 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
       rspmat = mIBSimResp->getResponse(scale_x * (xyzLocS.X() - cRowPix),
                                         scale_y * (xyzLocS.Z() - cColPix),
                                         xyzLocS.Y(), flipRow, flipCol, rowMaxVal, colMaxVal);
+      // check depth and middle of rspmat
+      // if(rspmat != nullptr && (abs(xyzLocS.X() - cRowPix) < 0.1 * 1.e-4) && (abs(xyzLocS.Z() - cColPix) < 0.1 * 1.e-4)) {
+      // // if(rspmat != nullptr){
+      //   std::cout<<"xy in pixel"<<(xyzLocS.X() - cRowPix) * 1.e4<<" "<<(xyzLocS.Z() - cColPix) * 1.e4<<" depth: "<<xyzLocS.Y() * 1.e4<<" middle of rspmat: "<<rspmat->getValue(2,2)<<std::endl;
+      // }
     } else {
       rspmat = mOBSimResp->getResponse(xyzLocS.X() - cRowPix,
                                        xyzLocS.Z() - cColPix,
@@ -456,7 +464,7 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
       for (int icol_local = 0; icol_local < AlpideRespSimMat::NPix; ++icol_local) {
         int colDest = col + icol_local - AlpideRespSimMat::NPix / 2 - colS;
         if (colDest < 0 || colDest >= colSpan) continue;
-        float localResponse = rspmat->getValue(irow_local, icol_local, flipRow, flipCol);
+        float localResponse = rspmat->getValue(irow_local, icol_local, innerBarrel ^ flipRow, flipCol);
         // 对当前步的这部分贡献进行 Poisson 抽样
         int nEleStep = gRandom->Poisson(nElectrons * localResponse);
         digitAccumulator[rowDest][colDest] += nEleStep;
