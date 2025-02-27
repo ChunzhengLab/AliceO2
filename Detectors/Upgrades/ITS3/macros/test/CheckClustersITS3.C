@@ -175,7 +175,7 @@ void CheckClustersITS3(const std::string& clusfile = "o2clus_its.root",
       auto isIB = o2::its3::constants::detID::isDetITS3(chipID);
       auto layer = o2::its3::constants::detID::getDetID2Layer(chipID);
       auto clusterSize{-1};
-      if (pattID == o2::itsmft::CompCluster::InvalidPatternID || dict.isGroup(pattID)) {
+      if (pattID == o2::itsmft::CompCluster::InvalidPatternID || dict.isGroup(pattID, isIB)) {
         o2::itsmft::ClusterPattern patt(pattIt);
         locC = dict.getClusterCoordinates(cluster, patt, false);
         LOGP(debug, "I am invalid and I am on chip {}", chipID);
@@ -183,11 +183,9 @@ void CheckClustersITS3(const std::string& clusfile = "o2clus_its.root",
         continue;
       } else {
         locC = dict.getClusterCoordinates(cluster);
-        errX = dict.getErrX(pattID);
-        errZ = dict.getErrZ(pattID);
-        errX *= (isIB) ? MosaixSegmentation::PitchRow : Segmentation::PitchRow;
-        errZ *= (isIB) ? MosaixSegmentation::PitchCol : Segmentation::PitchCol;
-        npix = dict.getNpixels(pattID);
+        errX = dict.getErrX(pattID, isIB);
+        errZ = dict.getErrZ(pattID, isIB);
+        npix = dict.getNpixels(pattID, isIB);
         ++cPattValid;
       }
 
