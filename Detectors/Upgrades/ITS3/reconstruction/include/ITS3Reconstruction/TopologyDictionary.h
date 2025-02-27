@@ -59,6 +59,7 @@ class TopologyDictionary
   /// Reads the dictionary from a binary file
   void readBinaryFile(const std::string& fileName);
   void readFromFile(const std::string& fileName);
+  void print() const noexcept;
 
   /// Returns the x position of the COG for the n_th element
   [[nodiscard]] float getXCOG(int n, bool IB) const

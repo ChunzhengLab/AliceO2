@@ -40,6 +40,15 @@ TopologyDictionary::TopologyDictionary(const std::string& fileName)
   readFromFile(fileName);
 }
 
+void TopologyDictionary::print() const noexcept
+{
+  LOG(info) << "ITS3 TopologyDictionary";
+  LOG(info) << "InnerBarrel";
+  mDataIB.print();
+  LOG(info) << "OuterBarrel";
+  mDataOB.print();
+}
+
 void TopologyDictionary::reset() noexcept
 {
   mDataIB.mSmallTopologiesLUT.fill(-1);
