@@ -81,7 +81,8 @@ class Digitizer : public TObject
 
   void setDeadChannelsMap(const o2::itsmft::NoiseMap* mp) { mDeadChanMap = mp; }
 
-  void isUseAPTSResponse(bool v) { mUseAPTSResp = v; }
+  void setResponseIB(const std::string& name) { mRespNameIB = name; }
+  void setChargeThresholdIB(int thr) { mChargeThresholdIB = thr; }
 
   void saveAndClose() {
     if (outfile_hit_info && tree_hit_info) {
@@ -137,12 +138,16 @@ class Digitizer : public TObject
   o2::dataformats::MCTruthContainer<o2::MCCompLabel>* mMCLabels = nullptr; //! output labels
 
   const o2::itsmft::NoiseMap* mDeadChanMap = nullptr;
-
   bool mUseAPTSResp = false; ///< use APTS response
+
+  std::string mRespNameIB = "ALPIDE"; ///< name of the response to be used
   double mRespDepthShiftIB = 0; ///< flat depth shift for all hits
   double mRespDepthShiftOB = 0; ///< flat depth shift for all hits
   double mScalePixelX = 1.0;
   double mScalePixelY = 1.0;
+  int mChargeThresholdIB = 0;
+
+  std::array<std::array<double, 5>, 5> goldenResponse(double injection_x = 0., double injection_y = 0., bool share = false);
 
   TFile* outfile_hit_info = nullptr;
   TTree* tree_hit_info = nullptr;

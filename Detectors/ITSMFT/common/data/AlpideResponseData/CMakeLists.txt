@@ -34,10 +34,12 @@ endif()
 add_custom_command(TARGET O2exe-alpide-response-generator POST_BUILD
                    COMMAND ${CMAKE_BINARY_DIR}/stage/bin/o2-alpide-response-generator -i ${ITSRESPONSE_DIR}/response/AlpideResponseData/ -o ${CMAKE_CURRENT_BINARY_DIR}/ -c "Alpide"
                    COMMAND ${CMAKE_BINARY_DIR}/stage/bin/o2-alpide-response-generator -i ${ITSRESPONSE_DIR}/response/ITS3ChipResponseData/AptsResponseData/ -o ${CMAKE_CURRENT_BINARY_DIR}/ -c "Apts"
+                   COMMAND ${CMAKE_BINARY_DIR}/stage/bin/o2-alpide-response-generator -i ${ITSRESPONSE_DIR}/response/ITS3ChipResponseData/DummyResponseData/ -o ${CMAKE_CURRENT_BINARY_DIR}/ -c "Dummy"
                    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/AlpideResponseData.root
                               ${CMAKE_CURRENT_BINARY_DIR}/AptsResponseData.root
+                              ${CMAKE_CURRENT_BINARY_DIR}/DummyResponseData.root
                    DEPENDS alpide-response-generator
-                   COMMENT "Generating AlpideResponseData.root and AptsResponseData.root"
+                   COMMENT "Generating AlpideResponseData.root, AptsResponseData.root and DummyResponseData.root"
 )
 
 # Add a custom target to depend on both files
@@ -45,8 +47,10 @@ add_custom_target(
   GenerateAlpideResponse ALL
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/AlpideResponseData.root
           ${CMAKE_CURRENT_BINARY_DIR}/AptsResponseData.root
+          ${CMAKE_CURRENT_BINARY_DIR}/DummyResponseData.root
 )
 
 # Install the generated files
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/AlpideResponseData.root" DESTINATION "${CMAKE_INSTALL_PREFIX}/share/Detectors/ITSMFT/data/AlpideResponseData/")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/AptsResponseData.root" DESTINATION "${CMAKE_INSTALL_PREFIX}/share/Detectors/ITS3/data/ITS3ChipResponseData/")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/DummyResponseData.root" DESTINATION "${CMAKE_INSTALL_PREFIX}/share/Detectors/ITS3/data/ITS3ChipResponseData/")

@@ -69,7 +69,9 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
   void initDigitizerTask(framework::InitContext& ic) override
   {
     mDisableQED = ic.options().get<bool>("disable-qed");
-    mUseAPTSResponse = ic.options().get<bool>("use-apts-response");
+    // mUseAPTSResponse = ic.options().get<bool>("use-apts-response");
+    mChipRespIB = ic.options().get<std::string>("chip-resp-ib");
+    mThrIB = ic.options().get<int>("thr-ib");
   }
 
   void run(framework::ProcessingContext& pc)
@@ -103,9 +105,10 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
     mDigitizer.setDigits(&mDigits);
     mDigitizer.setROFRecords(&mROFRecords);
     mDigitizer.setMCLabels(&mLabels);
+    // mDigitizer.isUseAPTSResponse(mUseAPTSResponse);
 
     std::cout<<"======================================"<<std::endl;
-    std::cout<<"mUseAPTSResponse: "<<mUseAPTSResponse<<std::endl;
+    std::cout<<"mChipRespIB: "<<mChipRespIB<<std::endl;
     std::cout<<"======================================"<<std::endl;
 
     // digits are directly put into DPL owned resource
@@ -253,7 +256,8 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
         pc.inputs().get<o2::itsmft::NoiseMap*>("IT3_dead"); // trigger final ccdb update
       }
 
-      mDigitizer.isUseAPTSResponse(mUseAPTSResponse);
+      mDigitizer.setResponseIB(mChipRespIB);
+      mDigitizer.setChargeThresholdIB(mThrIB);
 
       // init digitizer
       mDigitizer.init();
@@ -280,7 +284,8 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
   bool mWithMCTruth{true};
   bool mFinished{false};
   bool mDisableQED{false};
-  bool mUseAPTSResponse{false};
+  std::string mChipRespIB{"ALPIDE"};
+  int mThrIB{150};
   const o2::detectors::DetID mID{o2::detectors::DetID::IT3};
   const o2::header::DataOrigin mOrigin{o2::header::gDataOriginIT3};
   o2::its3::Digitizer mDigitizer{};
@@ -298,7 +303,7 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
   o2::parameters::GRPObject::ROMode mROMode = o2::parameters::GRPObject::PRESENT; // readout mode
 };
 
-DataProcessorSpec getITS3DigitizerSpec(int channel, bool mctruth)
+DataProcessorSpec getITS3DigitizerSpec(int channel, bool mctruth)//
 {
   std::string detStr = o2::detectors::DetID::getName(o2::detectors::DetID::IT3);
   auto detOrig = o2::header::gDataOriginIT3;
@@ -313,7 +318,8 @@ DataProcessorSpec getITS3DigitizerSpec(int channel, bool mctruth)
                            inputs, makeOutChannels(detOrig, mctruth),
                            AlgorithmSpec{adaptFromTask<ITS3DPLDigitizerTask>(mctruth)},
                            Options{{"disable-qed", o2::framework::VariantType::Bool, false, {"disable QED handling"}},
-                                   {"use-apts-response", o2::framework::VariantType::Bool, false, {"use APTS response"}}}};
+                                   {"thr-ib", o2::framework::VariantType::Int, 150, {"charge threshold for IB"}},
+                                   {"chip-resp-ib", o2::framework::VariantType::String, "ALPIDE", {"chip response name for IB"}}}};
 }
 
 } // namespace o2::its3

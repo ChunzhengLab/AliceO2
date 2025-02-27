@@ -18,6 +18,7 @@
 #include "DataFormatsITSMFT/TopologyDictionary.h"
 #include "DataFormatsITSMFT/ClusterPattern.h"
 #include "ITS3Base/SegmentationMosaix.h"
+#include "ITS3Base/SpecsV2.h"
 
 namespace o2::its3
 {
@@ -47,7 +48,9 @@ class TopologyDictionary
 
   int readFromFile(const std::string& fileName);
 
-  static constexpr double shiftYFlat = 13.58 * 1.e-4; ///< Shift in the y direction for the flat topology
+  // static constexpr double shiftYFlat = 0.; //For Dummy have to compile eveytime
+  static constexpr double shiftYFlat = constants::pixelarray::pixels::apts::shiftTopo; //APTS
+  // static constexpr double shiftYFlat = constants::pixelarray::pixels::alpide::shiftTopo; //ALPIDE
 
   /// Returns the x position of the COG for the n_th element
   inline float getXCOG(int n) const

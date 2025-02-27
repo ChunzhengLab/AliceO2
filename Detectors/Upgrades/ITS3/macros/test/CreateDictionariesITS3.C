@@ -2,9 +2,6 @@
 // See https://alice-o2.web.cern.ch/copyright for details of the copyright holders.
 // All rights not expressly granted are reserved.
 //
-// This software is distributed under the terms of the GNU General Public
-// License v3 (GPL Version 3), copied verbatim in the file "COPYING".
-//
 // In applying this license CERN does not waive the privileges and immunities
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
@@ -82,7 +79,7 @@ void CreateDictionariesITS3(bool saveDeltas = false,
   std::vector<HitVec*> hitVecPool;
   std::vector<MC2HITS_map> mc2hitVec;
   o2::its3::TopologyDictionary clusDictOld;
-  std::array<its3::SegmentationMosaix, 3> SegmentationsIB{0, 1, 2};
+  std::array<SegmentationMosaix, 3> SegmentationsIB{0, 1, 2};
   if (!clusDictFile.empty()) {
     clusDictOld.readFromFile(clusDictFile);
     LOGP(info, "Loaded external cluster dictionary with {} entries from {}", clusDictOld.getSize(), clusDictFile);
@@ -170,7 +167,20 @@ void CreateDictionariesITS3(bool saveDeltas = false,
     return;
   }
 
-  // Topologies dictionaries: 1) all clusters 2) signal clusters only 3) noise clusters only
+  // ---------- 新增：分别生成 ITS3IB 与 ITS3OB 的字典 ----------
+  // ITS3IB 表示属于 ITS3 的集群，ITS3OB 表示非 ITS3 的集群
+  BuildTopologyDictionary completeDictionaryITS3IB;
+  BuildTopologyDictionary signalDictionaryITS3IB;
+  BuildTopologyDictionary noiseDictionaryITS3IB;
+
+  BuildTopologyDictionary completeDictionaryITS3OB;
+  BuildTopologyDictionary signalDictionaryITS3OB;
+  BuildTopologyDictionary noiseDictionaryITS3OB;
+
+  // auto h2DxDzIB = new TH1D("hDxDzIB","hDxDzIB",100)
+  // -------------------------------------------------------------
+
+  // 原有的（全部）字典对象，如果需要可以保留
   BuildTopologyDictionary completeDictionary;
   BuildTopologyDictionary signalDictionary;
   BuildTopologyDictionary noiseDictionary;
@@ -261,6 +271,8 @@ void CreateDictionariesITS3(bool saveDeltas = false,
             const auto& mc2hit = mc2hitVec[lab.getEventID()];
             const auto* hitArray = hitVecPool[lab.getEventID()];
             Int_t chipID = cluster.getSensorID();
+            bool isIB = o2::its3::constants::detID::isDetITS3(chipID);
+
             uint64_t key = (uint64_t(trID) << 32) + chipID;
             auto hitEntry = mc2hit.find(key);
             if (hitEntry != mc2hit.end()) {
@@ -271,19 +283,20 @@ void CreateDictionariesITS3(bool saveDeltas = false,
                 o2::math_utils::Vector3D<float> xyzLocM;
                 xyzLocM.SetCoordinates(0.5f * (xyzLocE.X() + xyzLocS.X()), 0.5f * (xyzLocE.Y() + xyzLocS.Y()), 0.5f * (xyzLocE.Z() + xyzLocS.Z()));
                 auto locC = o2::its3::TopologyDictionary::getClusterCoordinates(cluster, pattern, false);
-                bool isIB = o2::its3::constants::detID::isDetITS3(chipID);
                 int layer = gman->getLayer(chipID);
                 if (isIB) {
                   float xFlat{0.}, yFlat{0.};
-                  o2::its3::SegmentationsIB[layer].curvedToFlat(xyzLocM.X(), xyzLocM.Y(), xFlat, yFlat);
+                  SegmentationsIB[layer].curvedToFlat(xyzLocM.X(), xyzLocM.Y(), xFlat, yFlat);
                   xyzLocM.SetCoordinates(xFlat, yFlat, xyzLocM.Z());
-                  o2::its3::SegmentationsIB[layer].curvedToFlat(locC.X(), locC.Y(), xFlat, yFlat);
+                  SegmentationsIB[layer].curvedToFlat(locC.X(), locC.Y(), xFlat, yFlat);
                   locC.SetCoordinates(xFlat, yFlat, locC.Z());
                 }
                 dX = xyzLocM.X() - locC.X();
                 dZ = xyzLocM.Z() - locC.Z();
+                std::cout<<"dX, dZ = " << dX << " " << dZ<<endl;
                 dX /= (isIB) ? o2::its3::SegmentationMosaix::mPitchRow : o2::itsmft::SegmentationAlpide::PitchRow;
                 dZ /= (isIB) ? o2::its3::SegmentationMosaix::mPitchCol : o2::itsmft::SegmentationAlpide::PitchCol;
+                std::cout<<"scaled dX, dZ = " << dX << " " << dZ<<endl;
                 if (saveDeltas) {
                   nt->Fill(topology.getHash(), dX, dZ);
                 }
@@ -304,11 +317,34 @@ void CreateDictionariesITS3(bool saveDeltas = false,
               ++cFailedMC;
             }
             signalDictionary.accountTopology(topology, dX, dZ);
+            if (isIB) {
+              signalDictionaryITS3IB.accountTopology(topology, dX, dZ);
+            } else {
+              signalDictionaryITS3OB.accountTopology(topology, dX, dZ);
+            }
           } else {
+            // 噪声集群处理
             noiseDictionary.accountTopology(topology, dX, dZ);
+            Int_t chipID = cluster.getSensorID();
+            bool isIB = o2::its3::constants::detID::isDetITS3(chipID);
+            if (isIB) {
+              noiseDictionaryITS3IB.accountTopology(topology, dX, dZ);
+            } else {
+              noiseDictionaryITS3OB.accountTopology(topology, dX, dZ);
+            }
           }
         }
+        // 全部集群记录到全局完整字典和分流到 ITS3IB/ITS3OB 完整字典
         completeDictionary.accountTopology(topology, dX, dZ);
+        {
+          Int_t chipID = cluster.getSensorID();
+          bool isIB = o2::its3::constants::detID::isDetITS3(chipID);
+          if (isIB) {
+            completeDictionaryITS3IB.accountTopology(topology, dX, dZ);
+          } else {
+            completeDictionaryITS3OB.accountTopology(topology, dX, dZ);
+          }
+        }
       }
 
       // clean MC cache for events which are not needed anymore
@@ -327,58 +363,132 @@ void CreateDictionariesITS3(bool saveDeltas = false,
   LOGP(info, "Clusters: {} okay (failed MCHit2Clus {}); outliers {}", cOk, cFailedMC, cOutliers);
 
   auto dID = o2::detectors::DetID::IT3;
+  // 输出全局完整字典（可选）
+  // LOGP(info, "Complete Dictionary:");
+  // completeDictionary.setThreshold(probThreshold);
+  // completeDictionary.groupRareTopologies();
+  // // 输出二进制和文本格式
+  // completeDictionary.printDictionaryBinary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, ""));
+  // completeDictionary.printDictionary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "", "txt"));
+  // completeDictionary.saveDictionaryRoot(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "", "root"));
 
-  LOGP(info, "Complete Dictionary:");
-  completeDictionary.setThreshold(probThreshold);
-  completeDictionary.groupRareTopologies();
-  completeDictionary.printDictionaryBinary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, ""));
-  completeDictionary.printDictionary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "", "txt"));
-  completeDictionary.saveDictionaryRoot(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "", "root"));
+  // // 输出 ITS3IB（内部）的完整字典
+  // LOGP(info, "ITS3IB Complete Dictionary:");
+  // completeDictionaryITS3IB.setThreshold(probThreshold);
+  // completeDictionaryITS3IB.groupRareTopologies();
+  // completeDictionaryITS3IB.printDictionaryBinary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "IB"));
+  // completeDictionaryITS3IB.printDictionary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "IB", "txt"));
+  // completeDictionaryITS3IB.saveDictionaryRoot(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "IB", "root"));
 
-  TFile histogramOutput("histograms.root", "recreate");
-  TCanvas* cComplete = new TCanvas("cComplete", "Distribution of all the topologies");
-  cComplete->cd();
-  cComplete->SetLogy();
-  TH1F* hComplete = completeDictionary.getDictionary().getTopologyDistribution("hComplete");
-  hComplete->SetDirectory(nullptr);
-  hComplete->Draw("hist");
-  hComplete->Write();
-  cComplete->Write();
+  // // 输出 ITS3OB（外部）的完整字典
+  // LOGP(info, "ITS3OB Complete Dictionary:");
+  // completeDictionaryITS3OB.setThreshold(probThreshold);
+  // completeDictionaryITS3OB.groupRareTopologies();
+  // completeDictionaryITS3OB.printDictionaryBinary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "OB"));
+  // completeDictionaryITS3OB.printDictionary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "OB", "txt"));
+  // completeDictionaryITS3OB.saveDictionaryRoot(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "OB", "root"));
 
+  // 如果存在MC真值信息，则输出信号与噪声字典
   if (clusLabArr) {
-    LOGP(info, "Noise Dictionary:");
-    noiseDictionary.setThreshold(0.0001);
-    noiseDictionary.groupRareTopologies();
-    noiseDictionary.printDictionaryBinary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "noiseClusTopo"));
-    noiseDictionary.printDictionary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "noiseClusTopo", "txt"));
-    noiseDictionary.saveDictionaryRoot(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "noiseClusTopo", "root"));
+    // ITS3IB信号字典
+    LOGP(info, "ITS3IB Signal Dictionary:");
+    signalDictionaryITS3IB.setThreshold(0.0001);
+    signalDictionaryITS3IB.groupRareTopologies();
+    signalDictionaryITS3IB.printDictionaryBinary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "IB_signal"));
+    signalDictionaryITS3IB.printDictionary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "IB_signal", "txt"));
+    signalDictionaryITS3IB.saveDictionaryRoot(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "IB_signal", "root"));
 
-    LOGP(info, "Signal Dictionary:");
-    signalDictionary.setThreshold(0.0001);
-    signalDictionary.groupRareTopologies();
-    signalDictionary.printDictionaryBinary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "signal"));
-    signalDictionary.printDictionary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "signal", "txt"));
-    signalDictionary.saveDictionaryRoot(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "signal", "root"));
+    // ITS3IB噪声字典
+    LOGP(info, "ITS3IB Noise Dictionary:");
+    noiseDictionaryITS3IB.setThreshold(0.0001);
+    noiseDictionaryITS3IB.groupRareTopologies();
+    noiseDictionaryITS3IB.printDictionaryBinary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "IB_noise"));
+    noiseDictionaryITS3IB.printDictionary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "IB_noise", "txt"));
+    noiseDictionaryITS3IB.saveDictionaryRoot(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "IB_noise", "root"));
 
+    // ITS3OB信号字典
+    LOGP(info, "ITS3OB Signal Dictionary:");
+    signalDictionaryITS3OB.setThreshold(0.0001);
+    signalDictionaryITS3OB.groupRareTopologies();
+    signalDictionaryITS3OB.printDictionaryBinary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "OB_signal"));
+    signalDictionaryITS3OB.printDictionary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "OB_signal", "txt"));
+    signalDictionaryITS3OB.saveDictionaryRoot(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "OB_signal", "root"));
+
+    // ITS3OB噪声字典
+    LOGP(info, "ITS3OB Noise Dictionary:");
+    noiseDictionaryITS3OB.setThreshold(0.0001);
+    noiseDictionaryITS3OB.groupRareTopologies();
+    noiseDictionaryITS3OB.printDictionaryBinary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "OB_noise"));
+    noiseDictionaryITS3OB.printDictionary(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "OB_noise", "txt"));
+    noiseDictionaryITS3OB.saveDictionaryRoot(o2::base::DetectorNameConf::getAlpideClusterDictionaryFileName(dID, "OB_noise", "root"));
+
+    // 绘制所有直方图
     LOGP(info, "Plotting Channels");
-    auto cNoise = new TCanvas("cNoise", "Distribution of noise topologies");
-    cNoise->cd();
-    cNoise->SetLogy();
-    auto hNoise = noiseDictionary.getDictionary().getTopologyDistribution("hNoise");
-    hNoise->SetDirectory(nullptr);
-    hNoise->Draw("hist");
+    TFile histogramOutput("histograms.root", "recreate");
+
+    // 全局直方图：信号与噪声
+    TCanvas* cSignalGlobal = new TCanvas("cSignalGlobal", "Global Signal Topologies");
+    cSignalGlobal->cd();
+    cSignalGlobal->SetLogy();
+    auto hSignalGlobal = signalDictionary.getDictionary().getTopologyDistribution("hSignalGlobal");
+    hSignalGlobal->SetDirectory(nullptr);
+    hSignalGlobal->Draw("hist");
     histogramOutput.cd();
-    hNoise->Write();
-    cNoise->Write();
-    auto cSignal = new TCanvas("cSignal", "cSignal");
-    cSignal->cd();
-    cSignal->SetLogy();
-    auto hSignal = signalDictionary.getDictionary().getTopologyDistribution("hSignal");
-    hSignal->SetDirectory(nullptr);
-    hSignal->Draw("hist");
+    hSignalGlobal->Write();
+    cSignalGlobal->Write();
+
+    TCanvas* cNoiseGlobal = new TCanvas("cNoiseGlobal", "Global Noise Topologies");
+    cNoiseGlobal->cd();
+    cNoiseGlobal->SetLogy();
+    auto hNoiseGlobal = noiseDictionary.getDictionary().getTopologyDistribution("hNoiseGlobal");
+    hNoiseGlobal->SetDirectory(nullptr);
+    hNoiseGlobal->Draw("hist");
     histogramOutput.cd();
-    hSignal->Write();
-    cSignal->Write();
+    hNoiseGlobal->Write();
+    cNoiseGlobal->Write();
+
+    // ITS3IB直方图：信号与噪声
+    TCanvas* cSignalITS3IB = new TCanvas("cSignalITS3IB", "ITS3IB Signal Topologies");
+    cSignalITS3IB->cd();
+    cSignalITS3IB->SetLogy();
+    auto hSignalITS3IB = signalDictionaryITS3IB.getDictionary().getTopologyDistribution("hSignalITS3IB");
+    hSignalITS3IB->SetDirectory(nullptr);
+    hSignalITS3IB->Draw("hist");
+    histogramOutput.cd();
+    hSignalITS3IB->Write();
+    cSignalITS3IB->Write();
+
+    TCanvas* cNoiseITS3IB = new TCanvas("cNoiseITS3IB", "ITS3IB Noise Topologies");
+    cNoiseITS3IB->cd();
+    cNoiseITS3IB->SetLogy();
+    auto hNoiseITS3IB = noiseDictionaryITS3IB.getDictionary().getTopologyDistribution("hNoiseITS3IB");
+    hNoiseITS3IB->SetDirectory(nullptr);
+    hNoiseITS3IB->Draw("hist");
+    histogramOutput.cd();
+    hNoiseITS3IB->Write();
+    cNoiseITS3IB->Write();
+
+    // ITS3OB直方图：信号与噪声
+    TCanvas* cSignalITS3OB = new TCanvas("cSignalITS3OB", "ITS3OB Signal Topologies");
+    cSignalITS3OB->cd();
+    cSignalITS3OB->SetLogy();
+    auto hSignalITS3OB = signalDictionaryITS3OB.getDictionary().getTopologyDistribution("hSignalITS3OB");
+    hSignalITS3OB->SetDirectory(nullptr);
+    hSignalITS3OB->Draw("hist");
+    histogramOutput.cd();
+    hSignalITS3OB->Write();
+    cSignalITS3OB->Write();
+
+    TCanvas* cNoiseITS3OB = new TCanvas("cNoiseITS3OB", "ITS3OB Noise Topologies");
+    cNoiseITS3OB->cd();
+    cNoiseITS3OB->SetLogy();
+    auto hNoiseITS3OB = noiseDictionaryITS3OB.getDictionary().getTopologyDistribution("hNoiseITS3OB");
+    hNoiseITS3OB->SetDirectory(nullptr);
+    hNoiseITS3OB->Draw("hist");
+    histogramOutput.cd();
+    hNoiseITS3OB->Write();
+    cNoiseITS3OB->Write();
+
     sw.Stop();
     sw.Print();
   }

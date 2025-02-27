@@ -25,6 +25,7 @@
 #include <TTree.h>
 #include "TGeoGlobalMagField.h"
 
+#include "ITSMFTSimulation/Hit.h"
 #include "DataFormatsITS/TrackITS.h"
 #include "DetectorsBase/Propagator.h"
 #include "Field/MagneticField.h"
@@ -33,8 +34,12 @@
 #include "SimulationDataFormat/MCCompLabel.h"
 #include "SimulationDataFormat/MCEventHeader.h"
 #include "SimulationDataFormat/MCTrack.h"
+#include "DataFormatsITSMFT/ROFRecord.h"
 #include "SimulationDataFormat/MCTruthContainer.h"
 #include "SimulationDataFormat/TrackReference.h"
+#include "ITS3Reconstruction/TopologyDictionary.h"
+#include "ITSMFTBase/SegmentationAlpide.h"
+#include "ITS3Base/SegmentationMosaix.h"
 
 #include <array>
 #include <cmath>
@@ -45,6 +50,9 @@
 using namespace std;
 using namespace o2::itsmft;
 using namespace o2::its;
+
+using SegmentationIB = o2::its3::SegmentationMosaix;
+using SegmentationOB = o2::itsmft::SegmentationAlpide;
 
 struct ParticleInfo {
   int event{};
@@ -65,17 +73,38 @@ struct ParticleInfo {
   unsigned char isFake = 0u;
   bool isPrimary = false;
   unsigned char storedStatus = 2; /// not stored = 2, fake = 1, good = 0
+  int clusterSize[7] = {-99, -99, -99, -99, -99, -99, -99};
+  int clusterPattern[7] = {-99, -99, -99, -99, -99, -99, -99};
+  float clusterLocX[7] = {-99., -99., -99., -99., -99., -99., -99.};
+  float clusterLocZ[7] = {-99., -99., -99., -99., -99., -99., -99.};
+  float hitLocX[7] = {-99., -99., -99., -99., -99., -99., -99.};
+  float hitLocY[7] = {-99., -99., -99., -99., -99., -99., -99.};
+  float hitLocZ[7] = {-99., -99., -99., -99., -99., -99., -99.};
   o2::its::TrackITS track;
 };
 
 #pragma link C++ class ParticleInfo + ;
 
-void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
-                     const std::string& clusfile = "o2clus_its.root",
-                     const std::string& kinefile = "o2sim_Kine.root",
-                     const std::string& magfile = "o2sim_grp.root",
-                     const std::string& inputGeom = "",
-                     bool batch = false)
+
+void CurvedLocal2FlatIB(o2::math_utils::Point3D<float> &point, const int layer) {
+  if(layer > 3) {
+    cerr << "CurvedLocal2FlatIB: layer > 3" << endl;
+    return;
+  }
+  float xFlat{0}, yFlat{0};
+  SegmentationIB(layer).curvedToFlat(point.X(), point.Y(), xFlat, yFlat);
+  point.SetXYZ(xFlat, yFlat, point.Z());
+}
+
+
+void CorrTracksClusters(const std::string& tracfile = "o2trac_its.root",
+                             const std::string& clusfile = "o2clus_its.root",
+                             const std::string& kinefile = "o2sim_Kine.root",
+                             const std::string& magfile = "o2sim_grp.root",
+                             const std::string& hitfile = "o2sim_HitsIT3.root",
+                             const std::string& dictfile = "/Users/wangchunzheng/alice/ccdb_old/IT3/Calib/ClusterDictionary/snapshot.root",
+                             const std::string& inputGeom = "",
+                             bool batch = false)
 {
   gROOT->SetBatch(batch);
 
@@ -86,6 +115,18 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
   // Geometry
   o2::base::GeometryManager::loadGeometry(inputGeom);
   auto gman = o2::its::GeometryTGeo::Instance();
+  gman->fillMatrixCache(o2::math_utils::bit2Mask(o2::math_utils::TransformType::T2L, o2::math_utils::TransformType::T2GRot,
+                                                 o2::math_utils::TransformType::L2G)); // request cached transforms
+
+  // Hits
+  TFile::Open(hitfile.data());
+  TTree* hitTree = (TTree*)gFile->Get("o2sim");
+  std::vector<o2::itsmft::Hit>* hitArray = nullptr;
+  hitTree->SetBranchAddress("IT3Hit", &hitArray);
+  std::vector<std::vector<Hit>*> hitVecPool;
+  std::vector<std::unordered_map<uint64_t, int>> mc2hitVec;
+  mc2hitVec.resize(hitTree->GetEntries());
+  hitVecPool.resize(hitTree->GetEntries(), nullptr);
 
   // MC tracks
   TFile::Open(kinefile.data());
@@ -99,6 +140,16 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
   o2::dataformats::MCEventHeader* mcEvent = nullptr;
   mcTree->SetBranchAddress("MCEventHeader.", &mcEvent);
 
+  // Topology dictionary
+  o2::its3::TopologyDictionary dict;
+  std::ifstream iofile(dictfile.c_str());
+  if (iofile.good()) {
+    LOG(info) << "Running with dictionary: " << dictfile.c_str();
+    dict.readFromFile(dictfile);
+  } else {
+    LOG(info) << "Running without dictionary !";
+  }
+
   // Clusters
   TFile::Open(clusfile.data());
   TTree* clusTree = (TTree*)gFile->Get("o2sim");
@@ -107,6 +158,19 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
   // Cluster MC labels
   o2::dataformats::MCTruthContainer<o2::MCCompLabel>* clusLabArr = nullptr;
   clusTree->SetBranchAddress("ITSClusterMCTruth", &clusLabArr);
+  std::vector<o2::itsmft::MC2ROFRecord> mc2rofVec;
+  std::vector<o2::itsmft::MC2ROFRecord>* mc2rofVecP = &mc2rofVec;
+  if ((hitTree != nullptr) && (clusTree->GetBranch("ITSClusterMCTruth") != nullptr)) {
+    clusTree->SetBranchAddress("ITSClusterMCTruth", &clusLabArr);
+    clusTree->SetBranchAddress("ITSClustersMC2ROF", &mc2rofVecP);
+  }
+
+  std::vector<unsigned char>* patternsPtr = nullptr;
+  auto pattBranch = clusTree->GetBranch("ITSClusterPatt");
+  if (pattBranch != nullptr) {
+    pattBranch->SetAddress(&patternsPtr);
+  }
+
 
   // Reconstructed tracks
   TFile::Open(tracfile.data());
@@ -117,8 +181,61 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
   std::vector<o2::MCCompLabel>* trkLabArr = nullptr;
   recTree->SetBranchAddress("ITSTrackMCTruth", &trkLabArr);
 
-  std::cout << "** Filling particle table ... " << std::flush;
-  int lastEventIDcl = -1, cf = 0;
+  // Clusters ROFrecords
+  std::vector<o2::itsmft::ROFRecord> rofRecVec, *rofRecVecP = &rofRecVec;
+  clusTree->SetBranchAddress("ITSClustersROF", &rofRecVecP);
+  clusTree->GetEntry(0);
+  unsigned int nROFRec = (int)rofRecVec.size();
+  std::vector<int> mcEvMin(nROFRec, hitTree->GetEntries());
+  std::vector<int> mcEvMax(nROFRec, -1);
+
+
+  // >> build min and max MC events used by each ROF
+  for (int imc = mc2rofVec.size(); imc--;) {
+    const auto& mc2rof = mc2rofVec[imc];
+    // printf("MCRecord: ");
+    // mc2rof.print();
+    if (mc2rof.rofRecordID < 0) {
+      continue; // this MC event did not contribute to any ROF
+    }
+    for (unsigned int irfd = mc2rof.maxROF - mc2rof.minROF + 1; irfd--;) {
+      unsigned int irof = mc2rof.rofRecordID + irfd;
+      if (irof >= nROFRec) {
+        LOG(error) << "ROF=" << irof << " from MC2ROF record is >= N ROFs=" << nROFRec;
+      }
+      if (mcEvMin[irof] > imc) {
+        mcEvMin[irof] = imc;
+      }
+      if (mcEvMax[irof] < imc) {
+        mcEvMax[irof] = imc;
+      }
+    }
+  }
+
+  LOGP(info, "Building min and max MC events used by each ROF");
+  auto pattIt = patternsPtr->cbegin();
+  for (unsigned int irof = 0; irof < nROFRec; irof++) {
+    const auto& rofRec = rofRecVec[irof];
+    // >> read and map MC events contributing to this ROF
+    for (int im = mcEvMin[irof]; im <= mcEvMax[irof]; im++) {
+      if (hitVecPool[im] == nullptr) {
+        hitTree->SetBranchAddress("IT3Hit", &hitVecPool[im]);
+        hitTree->GetEntry(im);
+        auto& mc2hit = mc2hitVec[im];
+        const auto* hitArray = hitVecPool[im];
+        for (int ih = hitArray->size(); ih--;) {
+          const auto& hit = (*hitArray)[ih];
+          uint64_t key = (uint64_t(hit.GetTrackID()) << 32) + hit.GetDetectorID();
+          // cout<<"build key: "<<key<<endl;
+          mc2hit.emplace(key, ih);
+        }
+      }
+    }
+  }
+
+  std::cout << "** Deal with hits ... " << std::flush;
+  // 看起来Hit并没有存储event信息，所以这里只能通过hit的芯片信息和track信息来进行匹配
+  int lastEventIDcl = -1;
   int nev = mcTree->GetEntriesFast();
   std::vector<std::vector<ParticleInfo>> info(nev);
   for (int n = 0; n < nev; n++) { // loop over MC events
@@ -139,7 +256,6 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
       // 这里循环了mc事件的每一个track，已经写入了他真实的(来自仿真的)运动学信息
     }
   }
-
   std::cout << "done." << std::endl;
 
   std::cout << "** Creating particle/clusters correspondance ... "
@@ -177,8 +293,62 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
       }
 
       const CompClusterExt& c = (*clusArr)[iClus];
-      auto layer = gman->getLayer(c.getSensorID());
-      info[evID][trackID].clusters |= 1 << layer; 
+      UShort_t chipID = c.getSensorID();
+      auto layer = gman->getLayer(chipID);
+      bool isIB = layer < 3;
+      info[evID][trackID].clusters |= 1 << layer;
+
+      //下面处理cluster的信息
+      auto clusterSize{-1};
+      o2::math_utils::Point3D<float> clusterPos;
+      auto pattID = c.getPatternID();
+      if (pattID == CompCluster::InvalidPatternID || dict.isGroup(pattID)) {
+        o2::itsmft::ClusterPattern patt(pattIt);
+        clusterPos = dict.getClusterCoordinates(c, patt, false);
+        clusterSize = patt.getNPixels();
+      } else {
+        clusterSize = dict.getNpixels(pattID);
+        clusterPos = dict.getClusterCoordinates(c);
+      }
+      info[evID][trackID].clusterSize[layer] = clusterSize;
+      info[evID][trackID].clusterPattern[layer] = pattID;
+      if(isIB) {
+        CurvedLocal2FlatIB(clusterPos, layer);
+      }
+      info[evID][trackID].clusterLocX[layer] = clusterPos.X();
+      info[evID][trackID].clusterLocZ[layer] = clusterPos.Z();
+
+      // hit 在此处绑定
+      const auto& mc2hit = mc2hitVec[lab.getEventID()];
+      const auto* hitArray = hitVecPool[lab.getEventID()];
+      uint64_t key = (uint64_t(trackID) << 32) + c.getSensorID();
+      // cout<<"search key: "<<key<<endl;
+      auto hitIt = mc2hit.find(key);
+      if (hitIt == mc2hit.end()) {
+        cout << "Failed to find MC hit entry for Tr" << trackID << " chipID" << c.getSensorID() << endl;
+        continue;
+      }
+      const auto& hit = (*hitArray)[hitIt->second];
+      //glo -> loc
+      o2::math_utils::Point3D<float> hitLocSta = gman->getMatrixL2G(chipID) ^ (hit.GetPosStart());
+      o2::math_utils::Point3D<float> hitLocEnd = gman->getMatrixL2G(chipID) ^ (hit.GetPos());
+
+      if(layer < 3) {
+        // local curved to flat
+        CurvedLocal2FlatIB(hitLocSta, layer);
+        CurvedLocal2FlatIB(hitLocEnd, layer);
+        info[evID][trackID].hitLocX[layer] = 0.5 * (hitLocSta.X() + hitLocEnd.X());
+        info[evID][trackID].hitLocY[layer] = 0.5 * (hitLocSta.Y() + hitLocEnd.Y());
+        info[evID][trackID].hitLocZ[layer] = 0.5 * (hitLocSta.Z() + hitLocEnd.Z());
+      } else {
+        auto x0 = hitLocSta.X(), dltx = hitLocEnd.X() - x0;
+        auto y0 = hitLocSta.Y(), dlty = hitLocEnd.Y() - y0;
+        auto z0 = hitLocSta.Z(), dltz = hitLocEnd.Z() - z0;
+        auto r = (0.5 * (SegmentationOB::SensorLayerThickness - SegmentationOB::SensorLayerThicknessEff) - y0) / dlty;
+        info[evID][trackID].hitLocX[layer] = x0 + r * dltx;
+        info[evID][trackID].hitLocY[layer] = y0 + r * dlty;
+        info[evID][trackID].hitLocZ[layer] = z0 + r * dltz;
+      }
     }
   }
   std::cout << "done." << std::endl;
@@ -220,6 +390,7 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
         // 这里直接把reco track的信息写入了info的track字段，只是在这个track是最好的情况下
         float ip[2]{0., 0.};
         info[evID][trackID].track.getImpactParams(info[evID][trackID].pvx, info[evID][trackID].pvy, info[evID][trackID].pvz, bz, ip);
+        //上面只是得到了ip[0]和ip[1]，也就是dcaxy和dcaz，并没有赋值操作
         info[evID][trackID].dcaxy = ip[0];
         info[evID][trackID].dcaz = ip[1];
         info[evID][trackID].recpt = info[evID][trackID].track.getPt();
@@ -298,13 +469,10 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
           h_dcaxy_vs_pt->Fill(part.pt, part.dcaxy * 10000);
           h_dcaz_vs_pt->Fill(part.pt, part.dcaz * 10000);
         }
-
-        // if (part.pt > 1.5) {
-          h_dcaxy_vs_eta->Fill(part.eta, part.dcaxy * 10000);
-          h_dcaxy_vs_phi->Fill(part.phi, part.dcaxy * 10000);
-          h_dcaz_vs_eta->Fill(part.eta, part.dcaz * 10000);
-          h_dcaz_vs_phi->Fill(part.phi, part.dcaz * 10000);
-        // }
+        h_dcaz_vs_eta->Fill(part.eta, part.dcaz * 10000);
+        h_dcaxy_vs_eta->Fill(part.eta, part.dcaxy * 10000);
+        h_dcaxy_vs_phi->Fill(part.phi, part.dcaxy * 10000);
+        h_dcaz_vs_phi->Fill(part.phi, part.dcaz * 10000);
 
         h_chi2->Fill(part.pt, part.track.getChi2());
 
@@ -326,7 +494,7 @@ void CheckTracksITS3(const std::string& tracfile = "o2trac_its.root",
   }
 
   std::cout << "** Streaming output TTree to file ... " << std::flush;
-  TFile file("CheckTracksITS3.root", "recreate");
+  TFile file("CorrTracksClusters.root", "recreate");
   TTree tree("ParticleInfo", "ParticleInfo");
   ParticleInfo pInfo;
   tree.Branch("particle", &pInfo);

@@ -23,6 +23,8 @@
 #include <TRandom.h>
 #include <vector>
 #include <numeric>
+#include <iostream>
+#include <array>
 
 using o2::itsmft::Hit;
 using SegmentationIB = o2::its3::SegmentationMosaix;
@@ -46,18 +48,20 @@ void Digitizer::init()
 
   if (mParams.getIBSimResponse() == nullptr || mParams.getOBSimResponse() == nullptr) {
     std::string responseFileALPIDE = "$(O2_ROOT)/share/Detectors/ITSMFT/data/AlpideResponseData/AlpideResponseData.root";
-    std::string responseFileAPTS = "$(O2_ROOT)/share/Detectors/ITS3/data/ITS3ChipResponseData/APTSResponseData.root";
+    std::string responseFileAPTS = "$(O2_ROOT)/share/Detectors/ITS3/data/ITS3ChipResponseData/AptsResponseData.root";
+    std::string responseFileDummy = "$(O2_ROOT)/share/Detectors/ITS3/data/ITS3ChipResponseData/DummyResponseData.root";
 
     std::string responseFileOB = responseFileALPIDE;
     LOGP(info, "Loading chip response for OB from file: {}", responseFileOB);
     auto fileOB = TFile::Open(responseFileOB.data());
 
     std::string responseFileIB = responseFileALPIDE;
-    std::cout<<"======================================"<<std::endl;
-    std::cout<<"mUseAPTSResp: "<<mUseAPTSResp<<std::endl;
-    std::cout<<"======================================"<<std::endl;
-    if(mUseAPTSResp) {
+    if(mRespNameIB == "APTS") {
       responseFileIB = responseFileAPTS;
+    } else if(mRespNameIB == "Dummy" || mRespNameIB == "Golden") {
+      responseFileIB = responseFileDummy;
+    } else {
+      responseFileIB = responseFileALPIDE;
     }
     LOGP(info, "Loading chip response for IB from file: {}", responseFileIB);
     auto fileIB = TFile::Open(responseFileIB.data());
@@ -75,10 +79,32 @@ void Digitizer::init()
     mRespDepthShiftIB = mIBSimResp->getDepthMax() - constants::silicon::thicknessOut;
     mRespDepthShiftOB = mOBSimResp->getDepthMax() - SegmentationOB::SensorLayerThickness / 2;
     
-    if (mUseAPTSResp) {
-      mScalePixelX = constants::pixelarray::pixels::apts::pitchX / constants::pixelarray::pixels::mosaix::pitchX;
-      mScalePixelY = constants::pixelarray::pixels::apts::pitchZ / constants::pixelarray::pixels::mosaix::pitchZ;
+    if (mRespNameIB == "APTS") {
+      mScalePixelX = constants::pixelarray::pixels::apts::pitchX / SegmentationIB::mPitchRow;
+      mScalePixelY = constants::pixelarray::pixels::apts::pitchZ / SegmentationIB::mPitchCol;
+    } else if(mRespNameIB == "ALPIDE") {
+      mScalePixelX = itsmft::SegmentationAlpide::PitchRow / SegmentationIB::mPitchRow;
+      mScalePixelY = itsmft::SegmentationAlpide::PitchCol / SegmentationIB::mPitchCol;
+    } else if(mRespNameIB == "Dummy" || mRespNameIB == "Golden") {
+      mScalePixelX = 25.e-4 / SegmentationIB::mPitchRow;
+      mScalePixelY = 25.e-4 / SegmentationIB::mPitchRow;
+      mRespDepthShiftIB = 0.; 
     }
+
+    std::cout<<"======================================"<<std::endl;
+    std::cout<<"mRespNameIB: "<<mRespNameIB<<std::endl;
+    if(mRespNameIB == "Golden") {
+      std::cout<<"Input response is masked, using internal functions to make the golden response for IB"<<std::endl;
+    }
+    if(mRespNameIB == "Dummy") {
+      std::cout<<"Input response is masked, using internal functions to make the dummy response for IB"<<std::endl;
+    }
+    std::cout<<"mScalePixelX: "<<mScalePixelX<<std::endl;
+    std::cout<<"mScalePixelY: "<<mScalePixelY<<std::endl;
+    std::cout<<"mRespDepthShiftIB: "<<mRespDepthShiftIB<<std::endl;
+    std::cout<<"mChargeThresholdIB: "<<mChargeThresholdIB<<std::endl;
+    std::cout<<"======================================"<<std::endl;
+
     mParams.setIBSimResponse(mIBSimResp);
     mParams.setOBSimResponse(mOBSimResp);
   }
@@ -200,9 +226,11 @@ void Digitizer::fillOutputContainer(uint32_t frameLast)
     rcROF.setFirstEntry(mDigits->size()); // start of current ROF in digits
 
     auto& extra = *(mExtraBuff.front().get());
-    for (size_t iChip{0}; iChip < mChips.size(); ++iChip) {
+    for (size_t iChip{0}; iChip < mChips.size(); ++iChip) {      
       auto& chip = mChips[iChip];
-      if (constants::detID::isDetITS3(iChip)) { // Check if this is a chip of ITS3
+      bool innerBarrel = constants::detID::isDetITS3(iChip);
+      int thr = innerBarrel ? mChargeThresholdIB : mParams.getChargeThreshold();
+      if (innerBarrel) { // Check if this is a chip of ITS3
         chip.addNoise(mROFrameMin, mROFrameMin, &mParams, SegmentationIB::mNRows, SegmentationIB::mNCols);
       } else {
         chip.addNoise(mROFrameMin, mROFrameMin, &mParams);
@@ -219,7 +247,7 @@ void Digitizer::fillOutputContainer(uint32_t frameLast)
           break; // is the digit ROFrame from the key > the max requested frame
         }
         auto& preDig = iter->second; // preDigit
-        if (preDig.charge >= mParams.getChargeThreshold()) {
+        if (preDig.charge >= thr) {
           int digID = mDigits->size();
           mDigits->emplace_back(chip.getChipIndex(), preDig.row, preDig.col, preDig.charge);
           mMCLabels->addElement(digID, preDig.labelRef.label);
@@ -307,7 +335,7 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
 
   const auto& matrix = mGeometry->getMatrixL2G(detID);
   bool innerBarrel{layer < 3};
-  math_utils::Vector3D<float> xyzLocS, xyzLocE;
+  math_utils::Vector3D<float> xyzLocS, xyzLocE; // 这是为了hit的起始点和终点的坐标
   xyzLocS = matrix ^ (hit.GetPosStart()); // Global hit coordinates to local detector coordinates
   xyzLocE = matrix ^ (hit.GetPos());
   if (innerBarrel) {
@@ -323,6 +351,14 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     data.xFlaEnd = xFlatE;
     data.yFlaEnd = yFlatE;
   }
+  // if (layer == 0 || layer == 4) {
+  //   std::cout<<"layer"<<layer<<std::endl;
+  //   std::cout<<"xyzLocS.Y()"<<xyzLocS.Y()<<"     xyzLocE.Y()"<<xyzLocE.Y()<<"   end-start"<<xyzLocE.Y()-xyzLocS.Y()<<std::endl;
+  // }
+
+  //这里的过程是利用xyzLocS和xyzLocE两个点的坐标
+  //求出来总的要走多长的距离，然后除以nSteps，得到每一步的距离，nStep取了7
+  //然后把xyzLocS(E)的坐标分别后(前)移了一半的距离
 
   // 计算模拟步长
   math_utils::Vector3D<float> step = xyzLocE;
@@ -333,6 +369,12 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
   xyzLocE -= stepH;
 
   int rowS = -1, colS = -1, rowE = -1, colE = -1, nSkip = 0;
+
+  //这里是吧xyzLocS和xyzLocE两个点的坐标转换成row和col，如果无法转换成row和col
+  //就把xyzLocS和xyzLocE分别向前和向后移动一步，直到能转换成row和col
+  //最后的结果是rowS和colS是xyzLocS的坐标对应的row和col
+  //rowE和colE是xyzLocE的坐标对应的row和col
+
   if (innerBarrel) {
     // get entrance pixel row and col
     while (!SegmentationsIB[layer].localToDetector(xyzLocS.X(), xyzLocS.Z(), rowS, colS)) { // guard-ring ?
@@ -372,7 +414,7 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
   if (colS > colE) {
     std::swap(colS, colE);
   }
-  rowS -= AlpideRespSimMat::NPix / 2;
+  rowS -= AlpideRespSimMat::NPix / 2; // 把电荷沉积范围扩大到NPix/2，这里是2
   rowE += AlpideRespSimMat::NPix / 2;
   if (rowS < 0) {
     rowS = 0;
@@ -410,6 +452,7 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
   }
 
   std::vector<std::vector<int>> digitAccumulator(rowSpan, std::vector<int>(colSpan, 0));
+  std::vector<std::vector<int>> digitAccumulatorPrev(rowSpan, std::vector<int>(colSpan, 0));
   // 对每个模拟步进行处理，每一步直接进行 Poisson 抽样并累加
   for (int iStep = nSteps; iStep--;) {
     // 获取当前子步所在的像素编号
@@ -432,10 +475,11 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     // double rowMaxVal = 0.5 * (innerBarrel ? SegmentationIB::mPitchRow : SegmentationOB::PitchRow);
     // double colMaxVal = 0.5 * (innerBarrel ? SegmentationIB::mPitchCol : SegmentationOB::PitchCol);
     const AlpideRespSimMat* rspmat = nullptr;
+    const auto rspmatGolden = goldenResponse((xyzLocS.X() - cRowPix), (xyzLocS.Z() - cColPix), (mRespNameIB == "Golden"));
     if (innerBarrel) {
       rspmat = mIBSimResp->getResponse(mScalePixelX * (xyzLocS.X() - cRowPix),
                                        mScalePixelY * (xyzLocS.Z() - cColPix),
-                                       xyzLocS.Y(), flipRow, flipCol, SegmentationIB::mPitchRow/2.,  SegmentationIB::mPitchCol/2.);
+                                       xyzLocS.Y(), flipRow, flipCol, mScalePixelX * SegmentationIB::mPitchRow / 2.,  mScalePixelY * SegmentationIB::mPitchCol / 2.);
       // check depth and middle of rspmat
       // if(rspmat != nullptr && (abs(xyzLocS.X() - cRowPix) < 0.1 * 1.e-4) && (abs(xyzLocS.Z() - cColPix) < 0.1 * 1.e-4)) {
       // // if(rspmat != nullptr){
@@ -444,7 +488,7 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     } else {
       rspmat = mOBSimResp->getResponse(xyzLocS.X() - cRowPix,
                                        xyzLocS.Z() - cColPix,
-                                       xyzLocS.Y(), flipRow, flipCol, SegmentationOB::PitchRow/2., SegmentationOB::PitchCol/2.);
+                                       xyzLocS.Y(), flipRow, flipCol, SegmentationOB::PitchRow / 2., SegmentationOB::PitchCol / 2.);
     }
     
     // 保存当前子步的电荷沉积坐标（如果需要调试或后续分析）
@@ -467,9 +511,16 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
       for (int icol_local = 0; icol_local < AlpideRespSimMat::NPix; ++icol_local) {
         int colDest = col + icol_local - AlpideRespSimMat::NPix / 2 - colS;
         if (colDest < 0 || colDest >= colSpan) continue;
-        float localResponse = rspmat->getValue(irow_local, icol_local, (mUseAPTSResp && innerBarrel) ^ flipRow, flipCol); // 对于APTS做IB，要在flipRow前取反
+        float localResponse = 0.f;
+        if ((mRespNameIB == "Golden" || mRespNameIB == "Dummy") && innerBarrel) {
+          localResponse = rspmatGolden[irow_local][icol_local];
+        } else {
+          localResponse = rspmat->getValue(irow_local, icol_local, ((mRespNameIB == "APTS") && innerBarrel) ^ flipRow, flipCol); // 对于APTS做IB，要在flipRow前取反
+        }
         // 对当前步的这部分贡献进行 Poisson 抽样
-        int nEleStep = gRandom->Poisson(nElectrons * localResponse);
+        //int nEleStep = gRandom->Poisson(nElectrons * localResponse);
+        int nEleStep = nElectrons * localResponse; // 这里的电子数是已经乘以了 nStepsInv 的
+        digitAccumulatorPrev[rowDest][colDest] = nEleStep;
         digitAccumulator[rowDest][colDest] += nEleStep;
       }
     }
@@ -479,7 +530,7 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     for (int i = 0; i < rowSpan; ++i) {
       for (int j = 0; j < colSpan; ++j) {
         if (digitAccumulator[i][j] > maxEle) {
-          maxEle = digitAccumulator[i][j];
+          maxEle = digitAccumulatorPrev[i][j];
         }
       }
     }
@@ -489,11 +540,12 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
   // 将各像素上累加的电子数（digitAccumulator）转换成最终的 digit
   o2::MCCompLabel lbl(hit.GetTrackID(), evID, srcID, false);
   auto roFrameAbs = mNewROFrame + roFrameRel;
+  int minThr = innerBarrel ? mChargeThresholdIB * 0.1 : mParams.getMinChargeToAccount();
   for (int i = 0; i < rowSpan; ++i) {
     uint16_t rowIS = i + rowS;
     for (int j = 0; j < colSpan; ++j) {
       int totalEle = digitAccumulator[i][j];
-      if (totalEle < mParams.getMinChargeToAccount())
+      if (totalEle < minThr)
         continue;
       uint16_t colIS = j + colS;
       registerDigits(chip, roFrameAbs, timeInROF, nFrames, rowIS, colIS, totalEle, lbl);
@@ -554,3 +606,57 @@ void Digitizer::registerDigits(o2::itsmft::ChipDigitsContainer& chip, uint32_t r
     }
   }
 }
+
+std::array<std::array<double, 5>, 5> Digitizer::goldenResponse(double injection_x, double injection_y, bool share) {
+  // Parameters
+  const double total_electrons = 10000.0;
+  const double sigma_x = constants::pixelarray::pixels::mosaix::pitchX / 2.0;
+  const double sigma_y = constants::pixelarray::pixels::mosaix::pitchZ / 2.0;
+  const double pitchX   = constants::pixelarray::pixels::mosaix::pitchX;
+  const double pitchY   = constants::pixelarray::pixels::mosaix::pitchZ;
+  const int gridSize    = 5;
+  const int center      = gridSize / 2; // center index (2 for 5x5 grid)
+
+  // Initialize grid with zeros
+  std::array<std::array<double, 5>, 5> grid{};
+  for (auto &row : grid) {
+      row.fill(0.0);
+  }
+
+  // Check if injection point is within the pixel boundaries
+  if (injection_x < -0.5 * pitchX || injection_x > 0.5 * pitchX ||
+      injection_y < -0.5 * pitchY || injection_y > 0.5 * pitchY) {
+      return grid;
+  }
+
+  if (share) {
+      // Loop over each pixel in the grid
+      for (int row = 0; row < gridSize; ++row) {
+          for (int col = 0; col < gridSize; ++col) {
+              // Map row to x and col to y
+              double x_center = (row - center) * pitchX;
+              double y_center = (col - center) * pitchY;
+
+              double x_min = x_center - pitchX / 2.0;
+              double x_max = x_center + pitchX / 2.0;
+              double y_min = y_center - pitchY / 2.0;
+              double y_max = y_center + pitchY / 2.0;
+
+              double arg_x_max = (x_max - injection_x) / (std::sqrt(2.0) * sigma_x);
+              double arg_x_min = (x_min - injection_x) / (std::sqrt(2.0) * sigma_x);
+              double fraction_x = 0.5 * (std::erf(arg_x_max) - std::erf(arg_x_min));
+
+              double arg_y_max = (y_max - injection_y) / (std::sqrt(2.0) * sigma_y);
+              double arg_y_min = (y_min - injection_y) / (std::sqrt(2.0) * sigma_y);
+              double fraction_y = 0.5 * (std::erf(arg_y_max) - std::erf(arg_y_min));
+
+              double electrons = total_electrons * fraction_x * fraction_y;
+              grid[row][col] = electrons / total_electrons;
+          }
+      }
+  } else {
+      grid[center][center] = 1.0;
+  }
+  return grid;
+}
+

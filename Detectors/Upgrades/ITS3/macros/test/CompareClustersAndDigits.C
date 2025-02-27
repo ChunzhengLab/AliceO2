@@ -325,7 +325,20 @@ void CompareClustersAndDigits(std::string clusfile = "o2clus_it3.root",
       //   continue;
       // }
 
+      // if(isIB) {
+      //   cout<<"we still have IB here before v1,v2,v3"<<endl;
+      // }
+      // if (!v1 || !v2 || !v3 || !v4) {
+      //   // sometimes the transformation for hit start/end do not work since they can beyond the chip if they are
+      //   // at the edge, so for visualisation purposes we do not draw these clusters
+      //   continue;
+      // }
+
       data[chipID].hitS->AddPoint(colHS, rowHS);
+      if (isIB) {
+        cout << "chipID: " << chipID << " rowHS: " << rowHS << " colHS: " <<endl;
+        cout << "NPoints: " << data[chipID].hitS->GetN() << endl;
+      }
       data[chipID].hitM->AddPoint(colHM, rowHM);
       data[chipID].hitE->AddPoint(colHE, rowHE);
       data[chipID].clusters->AddPoint(cluster.getCol(), cluster.getRow());

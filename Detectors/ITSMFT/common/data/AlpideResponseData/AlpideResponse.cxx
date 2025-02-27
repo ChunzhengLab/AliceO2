@@ -44,8 +44,12 @@ void alpideResponse(const std::string& inpath, const std::string& outpath, const
         resp0.initData(0, inpath.c_str());
         resp1.initData(1, inpath.c_str());
     } else if (chip_name == "Apts") {
-        resp1.setColMax(1.5e-4);
-        resp1.setRowMax(1.5e-4);
+        resp1.setColMax(15.e-4 / 2.);
+        resp1.setRowMax(15.e-4 / 2.);
+        resp1.initData(1, inpath.c_str());
+    } else if (chip_name == "Dummy") {
+        resp1.setColMax(30.e-4 / 2.);
+        resp1.setRowMax(30.e-4 / 2.);
         resp1.initData(1, inpath.c_str());
     } else {
         throw std::invalid_argument("Unknown chip name: " + chip_name);

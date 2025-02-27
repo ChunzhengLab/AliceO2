@@ -33,8 +33,8 @@ constexpr double mu{1e-6 * cm};
 constexpr double mm{1e-3 * cm};
 namespace pixelarray
 {
-constexpr double width{9.197 * mm};
-constexpr double length{3.571 * mm};
+constexpr double width{9.197 * mm}; // = 9.197 mm = 9197 mu = 91.97 * 1e-4 cm = 0.9197 cm -> should be x in the global coordinate
+constexpr double length{3.571 * mm}; // = 3.571 mm = 3571 mu = 35.71 * 1e-4 cm = 0.3571 cm -> should be z in the global coordinate
 constexpr int nCols{156};
 constexpr int nRows{442};
 constexpr int nPixels{nRows * nCols};
@@ -121,8 +121,8 @@ constexpr EColor color{kBlack};
 namespace silicon
 {
 constexpr double thickness{45 * mu};                                     // thickness of silicon
-constexpr double thicknessIn{(thickness + metalstack::thickness) / 2.};  // inner silicon thickness
-constexpr double thicknessOut{(thickness - metalstack::thickness) / 2.}; // outer silicon thickness
+constexpr double thicknessIn{(thickness + metalstack::thickness) / 2.};  // inner silicon thickness = 25 mu
+constexpr double thicknessOut{(thickness - metalstack::thickness) / 2.}; // outer silicon thickness = 20 mu
 } // namespace silicon
 constexpr unsigned int nLayers{3};
 constexpr unsigned int nTotLayers{7};
@@ -131,9 +131,8 @@ constexpr double equatorialGap{1 * mm};
 constexpr std::array<unsigned int, nLayers> nSegments{3, 4, 5};
 constexpr double totalThickness{silicon::thickness + metalstack::thickness};                                                                                         // total chip thickness
 constexpr std::array<double, nLayers> radii{19.0006 * mm, 25.228 * mm, 31.4554 * mm};                                                                                // nominal radius
-constexpr std::array<double, nLayers> radiiInner{radii[0] - silicon::thicknessIn, radii[1] - silicon::thicknessIn, radii[2] - silicon::thicknessIn};                 // inner silicon radius
-constexpr std::array<double, nLayers> radiiOuter{radii[0] + silicon::thicknessOut, radii[1] + silicon::thicknessOut, radii[2] + silicon::thicknessOut};              // outer silicon radius
-constexpr std::array<double, nLayers> radiiMiddle{(radiiInner[0] + radiiOuter[0]) / 2., (radiiInner[1] + radiiOuter[1]) / 2., (radiiInner[2] + radiiOuter[2]) / 2.}; // middle silicon radius
+constexpr std::array<double, nLayers> radiiInner{radii[0] - totalThickness/2., radii[1] - totalThickness/2., radii[2] - totalThickness/2.};                 // inner silicon radius
+constexpr std::array<double, nLayers> radiiOuter{radii[0] + totalThickness/2., radii[1] + totalThickness/2., radii[2] + totalThickness/2.};              // outer silicon radius
 
 // extra information of pixels and their response functions
 namespace pixelarray::pixels
@@ -147,9 +146,16 @@ namespace apts
 {
 constexpr double pitchX{15.0 * mu};
 constexpr double pitchZ{15.0 * mu};
-constexpr double responseUpperLimit{10 * mu};
-constexpr double responseYShift{responseUpperLimit - silicon::thicknessOut};
+constexpr double maxDepthRespFunc{10.35 * mu};        // from the response function
+constexpr double centreDepthRespFunc{3.583185 * mu}; // from the response function
+constexpr double shiftTopo{silicon::thicknessOut - (maxDepthRespFunc - centreDepthRespFunc)}; // from the response function
 } // namespace apts
+namespace alpide
+{
+constexpr double maxDepthRespFunc{25.0 * mu};        // from the response function
+constexpr double centreDepthRespFunc{1.388587e+01 * mu}; //TODO : need to be revised from the response function 
+constexpr double shiftTopo{silicon::thicknessOut - (maxDepthRespFunc - centreDepthRespFunc)}; // from the response function
+}
 namespace moss
 {
 namespace top
