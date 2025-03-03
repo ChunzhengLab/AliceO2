@@ -21,12 +21,12 @@
 #include "Rtypes.h"
 #include "TObject.h"
 
-#include "ITSMFTSimulation/ChipDigitsContainer.h"
 #include "ITSMFTSimulation/AlpideSimResponse.h"
 #include "ITSMFTSimulation/Hit.h"
 #include "ITSBase/GeometryTGeo.h"
 #include "ITS3Base/SegmentationMosaix.h"
 #include "ITS3Simulation/DigiParams.h"
+#include "ITS3Simulation/ChipDigitsContainer.h"
 #include "DataFormatsITSMFT/Digit.h"
 #include "DataFormatsITSMFT/ROFRecord.h"
 #include "CommonDataFormat/InteractionRecord.h"
@@ -78,7 +78,7 @@ class Digitizer : public TObject
 
  private:
   void processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID, int srcID);
-  void registerDigits(o2::itsmft::ChipDigitsContainer& chip, uint32_t roFrame, float tInROF, int nROF,
+  void registerDigits(o2::its3::ChipDigitsContainer& chip, uint32_t roFrame, float tInROF, int nROF,
                       uint16_t row, uint16_t col, int nEle, o2::MCCompLabel& lbl);
 
   ExtraDig* getExtraDigBuffer(uint32_t roFrame)
@@ -118,7 +118,7 @@ class Digitizer : public TObject
 
   const o2::its::GeometryTGeo* mGeometry = nullptr; ///< ITS3 geometry
 
-  std::vector<o2::itsmft::ChipDigitsContainer> mChips; ///< Array of chips digits containers
+  std::vector<o2::its3::ChipDigitsContainer> mChips;   ///< Array of chips digits containers
   std::deque<std::unique_ptr<ExtraDig>> mExtraBuff;    ///< burrer (per roFrame) for extra digits
 
   std::vector<o2::itsmft::Digit>* mDigits = nullptr;                       //! output digits

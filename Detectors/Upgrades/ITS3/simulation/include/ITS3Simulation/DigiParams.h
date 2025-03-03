@@ -19,7 +19,28 @@ namespace o2::its3
 
 class DigiParams final : public o2::itsmft::DigiParams
 {
+ private:
+  float mIBNoisePerPixel = 1.e-8;
+  int mIBChargeThreshold = 150;   ///< charge threshold in Nelectrons
+  int mIBMinChargeToAccount = 15; ///< minimum charge contribution to account
+  int mIBNSimSteps = 18;          ///< number of steps in response simulation
+  float mIBNSimStepsInv = 0;      ///< its inverse
+
  public:
+  DigiParams();
+
+  void setIBNoisePerPixel(float v) { mIBNoisePerPixel = v; }
+  float getIBNoisePerPixel() const { return mIBNoisePerPixel; }
+
+  void setIBChargeThreshold(int v, float frac2Account = 0.1);
+  int getIBChargeThreshold() const { return mIBChargeThreshold; }
+
+  void setIBNSimSteps(int v);
+  int getIBNSimSteps() const { return mIBNSimSteps; }
+  float getIBNSimStepsInv() const { return mIBNSimStepsInv; }
+
+  int getIBMinChargeToAccount() const { return mIBMinChargeToAccount; }
+
   const o2::itsmft::AlpideSimResponse* getAlpSimResponse() const = delete;
   void setAlpSimResponse(const o2::itsmft::AlpideSimResponse* par) = delete;
 
