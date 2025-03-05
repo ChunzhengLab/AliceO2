@@ -10,8 +10,6 @@
 
 #include "CommonUtils/ConfigurableParam.h"
 #include "CommonUtils/ConfigurableParamHelper.h"
-#include "ITSMFTSimulation/DPLDigitizerParam.h"
-#include <string>
 
 namespace o2
 {
