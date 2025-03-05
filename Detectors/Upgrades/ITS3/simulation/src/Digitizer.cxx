@@ -47,8 +47,8 @@ void Digitizer::init()
   }
 
   if (!mParams.hasResponseFunctions()) {
-    auto loadSetResponseFunc = [&](const char* name, const char* fileIB, const char* nameIB, const char* fileOB, const char* nameOB) {
-      LOGP(info, "Loading response function for {}: IB={}:{} ; OB={}:{}", name, nameIB, fileIB, nameOB, fileOB);
+    auto loadSetResponseFunc = [&](const char* fileIB, const char* nameIB, const char* fileOB, const char* nameOB) {
+      LOGP(info, "Loading response function IB={}:{} ; OB={}:{}", nameIB, fileIB, nameOB, fileOB);
       auto fIB = TFile::Open(fileIB, "READ");
       if (!fIB || fIB->IsZombie() || !fIB->IsOpen()) {
         LOGP(fatal, "Cannot open file {}", fileIB);
@@ -65,25 +65,27 @@ void Digitizer::init()
 
     if (const auto& func = ITS3Params::Instance().chipResponseFunction; func == "Alpide") {
       constexpr const char* responseFile = "$(O2_ROOT)/share/Detectors/ITSMFT/data/AlpideResponseData/AlpideResponseData.root";
-      loadSetResponseFunc("Alpide", responseFile, "response0", responseFile, "response1");
-      mSimRespIBShift = mSimRespIB->getDepthMax() - SegmentationIB::SensorLayerThickness / 2.f + 10.e-4f;
-      mSimRespOBShift = mSimRespOB->getDepthMax() - SegmentationOB::SensorLayerThickness / 2.f;
+      loadSetResponseFunc(responseFile, "response0", responseFile, "response0");
+      mSimRespIBScaleX = o2::itsmft::SegmentationAlpide::PitchRow / SegmentationIB::PitchRow;
+      mSimRespIBScaleZ = o2::itsmft::SegmentationAlpide::PitchCol / SegmentationIB::PitchCol;
     } else if (func == "APTS") {
       constexpr const char* responseFileIB = "$(O2_ROOT)/share/Detectors/Upgrades/ITS3/data/ITS3ChipResponseData/APTSResponseData.root";
       constexpr const char* responseFileOB = "$(O2_ROOT)/share/Detectors/ITSMFT/data/AlpideResponseData/AlpideResponseData.root";
-      loadSetResponseFunc("APTS", responseFileIB, "response1", responseFileOB, "response1");
-      mSimRespIBShift = mSimRespIB->getDepthMax() + (float)constants::pixelarray::pixels::apts::responseYShift;
-      mSimRespOBShift = mSimRespOB->getDepthMax() - SegmentationOB::SensorLayerThickness / 2.f;
-      mSimRespIBScaleX = 0.5f * constants::pixelarray::pixels::apts::pitchX / SegmentationIB::PitchRow;
-      mSimRespIBScaleZ = 0.5f * constants::pixelarray::pixels::apts::pitchZ / SegmentationIB::PitchCol;
+      loadSetResponseFunc(responseFileIB, "response1", responseFileOB, "response0");
+      mSimRespIBScaleX = constants::pixelarray::pixels::apts::pitchX / SegmentationIB::PitchRow;
+      mSimRespIBScaleZ = constants::pixelarray::pixels::apts::pitchZ / SegmentationIB::PitchCol;
       mSimRespIBOrientation = true;
     } else {
       LOGP(fatal, "ResponseFunction '{}' not implemented!", func);
     }
+    mSimRespIBShift = mSimRespIB->getDepthMax() - constants::silicon::thicknessOut;
+    mSimRespOBShift = mSimRespOB->getDepthMax() - SegmentationOB::SensorLayerThickness / 2.f;
   }
+
   mParams.print();
   LOGP(info, "IBShift = {} ; OBShift = {}", mSimRespIBShift, mSimRespOBShift);
   LOGP(info, "IB-Scale: X={} ; Z={}", mSimRespIBScaleX, mSimRespIBScaleZ);
+  LOGP(info, "IB-Orientation: {}", mSimRespIBOrientation ? "flipped" : "normal");
   mIRFirstSampledTF = o2::raw::HBFUtils::Instance().getFirstSampledTFIR();
 }
 
@@ -374,8 +376,8 @@ void Digitizer::processHit(const o2::itsmft::Hit& hit, uint32_t& maxFr, int evID
     float rowMax{}, colMax{};
     const AlpideRespSimMat* rspmat{nullptr};
     if (chip.isIB()) {
-      rowMax = 0.5f * SegmentationIB::PitchRow;
-      colMax = 0.5f * SegmentationIB::PitchCol;
+      rowMax = 0.5f * SegmentationIB::PitchRow * mSimRespIBScaleX;
+      colMax = 0.5f * SegmentationIB::PitchCol * mSimRespIBScaleZ;
       rspmat = mSimRespIB->getResponse(mSimRespIBScaleX * (xyzLocS.X() - cRowPix), mSimRespIBScaleZ * (xyzLocS.Z() - cColPix), xyzLocS.Y(), flipRow, flipCol, rowMax, colMax);
     } else {
       rowMax = 0.5f * SegmentationOB::PitchRow;
