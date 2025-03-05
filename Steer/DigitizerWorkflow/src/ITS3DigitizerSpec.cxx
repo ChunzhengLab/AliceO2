@@ -28,6 +28,7 @@
 #include "ITS3Simulation/Digitizer.h"
 #include "ITSMFTSimulation/DPLDigitizerParam.h"
 #include "ITS3Simulation/ITS3DPLDigitizerParam.h"
+#include "DataFormatsITS3/DepositionInfo.h"
 #include "ITSMFTBase/DPLAlpideParam.h"
 #include "ITSBase/GeometryTGeo.h"
 #include "ITS3Base/ITS3Params.h"
@@ -53,6 +54,7 @@ std::vector<OutputSpec> makeOutChannels(o2::header::DataOrigin detOrig, bool mct
     outputs.emplace_back(detOrig, "DIGITSMCTR", 0, Lifetime::Timeframe);
   }
   outputs.emplace_back(detOrig, "ROMode", 0, Lifetime::Timeframe);
+  outputs.emplace_back(detOrig, "DEPOSITIONINFO", 0, Lifetime::Timeframe);
   return outputs;
 }
 } // namespace
@@ -103,6 +105,7 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
     mDigitizer.setDigits(&mDigits);
     mDigitizer.setROFRecords(&mROFRecords);
     mDigitizer.setMCLabels(&mLabels);
+    mDigitizer.setDepositionInfoOutput(&mDepos);
 
     // digits are directly put into DPL owned resource
     auto& digitsAccum = pc.outputs().make<std::vector<itsmft::Digit>>(Output{mOrigin, "DIGITS", 0});
@@ -194,6 +197,8 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
     }
     LOG(info) << mID.getName() << ": Sending ROMode= " << mROMode << " to GRPUpdater";
     pc.outputs().snapshot(Output{mOrigin, "ROMode", 0}, mROMode);
+
+    pc.outputs().snapshot(Output{mOrigin, "DEPOSITIONINFO", 0}, mDepos);
 
     timer.Stop();
     LOG(info) << "Digitization took " << timer.CpuTime() << "s";
@@ -287,6 +292,7 @@ class ITS3DPLDigitizerTask : BaseDPLDigitizer
   std::vector<o2::itsmft::ROFRecord> mROFRecordsAccum{};
   std::vector<o2::itsmft::Hit> mHits{};
   std::vector<o2::itsmft::Hit>* mHitsP{&mHits};
+  std::vector<o2::its3::DepositionInfo> mDepos{};
   o2::dataformats::MCTruthContainer<o2::MCCompLabel> mLabels{};
   o2::dataformats::MCTruthContainer<o2::MCCompLabel> mLabelsAccum{};
   std::vector<o2::itsmft::MC2ROFRecord> mMC2ROFRecordsAccum{};

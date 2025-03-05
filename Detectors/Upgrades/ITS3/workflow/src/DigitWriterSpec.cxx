@@ -21,6 +21,7 @@
 #include "SimulationDataFormat/ConstMCTruthContainer.h"
 #include "SimulationDataFormat/IOMCTruthContainerView.h"
 #include "SimulationDataFormat/MCCompLabel.h"
+#include "DataFormatsITS3/DepositionInfo.h"
 #include <vector>
 #include <string>
 #include <algorithm>
@@ -98,7 +99,9 @@ DataProcessorSpec getDigitWriterSpec(bool mctruth, bool dec, bool calib, o2::hea
                                                                                     (detStr + "Calib").c_str(),
                                                                                     (calib ? 1 : 0)},
                                 BranchDefinition<std::vector<itsmft::ROFRecord>>{InputSpec{"digitsROF", detOrig, "DIGITSROF", 0},
-                                                                                 (detStr + "DigitROF").c_str()})();
+                                                                                 (detStr + "DigitROF").c_str()},
+                                BranchDefinition<std::vector<its3::DepositionInfo>>{InputSpec{"depositioninfo", detOrig, "DEPOSITIONINFO", 0},
+                                                                                 (detStr + "DepositionInfo").c_str()})();
 }
 
 DataProcessorSpec getITS3DigitWriterSpec(bool mctruth, bool dec, bool calib)

@@ -33,6 +33,7 @@ o2_add_library(ITS3Workflow
                                      O2::ITS3TrackingInterface
                                      O2::ITSWorkflow
                                      O2::GPUTracking
+                                     O2::DataFormatsITS3
                                      O2::ITSBase)
 
 # o2_add_executable(digit-writer-workflow

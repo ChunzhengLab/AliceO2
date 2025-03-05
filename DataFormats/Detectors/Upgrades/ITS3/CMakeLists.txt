@@ -9,5 +9,8 @@
 # granted to it by virtue of its status as an Intergovernmental Organization
 # or submit itself to any jurisdiction.
 
-message(STATUS "Building dataformats for upgrades")
-add_subdirectory(ITS3)
+o2_add_library(DataFormatsITS3
+               SOURCES src/DepositionInfo.cxx)
+
+o2_target_root_dictionary(DataFormatsITS3
+                          HEADERS include/DataFormatsITS3/DepositionInfo.h)
