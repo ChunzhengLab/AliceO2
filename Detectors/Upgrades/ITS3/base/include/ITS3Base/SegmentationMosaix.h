@@ -102,9 +102,9 @@ class SegmentationMosaix
     // stack
     float dist = std::hypot(xCurved, yCurved);
     float phi = std::atan2(yCurved, xCurved);
-    xFlat = (mRadius * phi) - WidthH;
     // the y position is in the silicon volume however we need the chip volume (silicon+metalstack)
     // this is accounted by a y shift
+    xFlat = WidthH - mRadius * phi;
     yFlat = dist - mRadius + NominalYShift;
   }
 
@@ -122,11 +122,12 @@ class SegmentationMosaix
   {
     // MUST align the flat surface with the curved surface with the original pixel array is on and account for metal
     // stack
+    float dist = yFlat - NominalYShift + mRadius;
+    float phi = (WidthH - xFlat) / mRadius;
     // the y position is in the chip volume however we need the silicon volume
     // this is accounted by a -y shift
-    float dist = yFlat - NominalYShift + mRadius;
-    xCurved = dist * std::cos((xFlat + WidthH) / mRadius);
-    yCurved = dist * std::sin((xFlat + WidthH) / mRadius);
+    xCurved = dist * std::cos(phi);
+    yCurved = dist * std::sin(phi);
   }
 
   /// Transformation from Geant detector centered local coordinates (cm) to
