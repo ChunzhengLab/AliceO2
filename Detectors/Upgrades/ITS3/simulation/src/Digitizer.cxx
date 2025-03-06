@@ -83,9 +83,9 @@ void Digitizer::init()
   }
 
   mParams.print();
-  LOGP(info, "IBShift = {} ; OBShift = {}", mSimRespIBShift, mSimRespOBShift);
-  LOGP(info, "IB-Scale: X={} ; Z={}", mSimRespIBScaleX, mSimRespIBScaleZ);
-  LOGP(info, "IB-Orientation: {}", mSimRespIBOrientation ? "flipped" : "normal");
+  LOGP(info, "IB shift = {} ; OB shift = {}", mSimRespIBShift, mSimRespOBShift);
+  LOGP(info, "IB pixel scale on x = {} ; z = {}", mSimRespIBScaleX, mSimRespIBScaleZ);
+  LOGP(info, "IB response orientation: {}", mSimRespIBOrientation ? "flipped" : "normal");
   mIRFirstSampledTF = o2::raw::HBFUtils::Instance().getFirstSampledTFIR();
 }
 

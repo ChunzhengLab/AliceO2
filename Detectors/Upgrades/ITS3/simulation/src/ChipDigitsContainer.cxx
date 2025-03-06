@@ -17,12 +17,7 @@ namespace its3
 {
 
 ChipDigitsContainer::ChipDigitsContainer(UShort_t idx)
-  : o2::itsmft::ChipDigitsContainer(idx),
-    innerBarrel(constants::detID::isDetITS3(idx)),
-    maxRows(innerBarrel ? SegmentationOB::NRows : SegmentationIB::NRows),
-    maxCols(innerBarrel ? SegmentationOB::NCols : SegmentationIB::NCols)
-{
-}
+  : o2::itsmft::ChipDigitsContainer(idx){}
 
 bool ChipDigitsContainer::isIB() const
 {
