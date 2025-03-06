@@ -39,6 +39,13 @@ class ChipDigitsContainer : public o2::itsmft::ChipDigitsContainer
   explicit ChipDigitsContainer(UShort_t idx = 0);
 
   /// Returns whether the chip is in the inner barrel (IB)
+  void setChipIndex(UShort_t idx)
+  {
+    o2::itsmft::ChipDigitsContainer::setChipIndex(idx);
+    innerBarrel = constants::detID::isDetITS3(getChipIndex());
+    maxRows = innerBarrel ? SegmentationOB::NRows : SegmentationIB::NRows;
+    maxCols = innerBarrel ? SegmentationOB::NCols : SegmentationIB::NCols;
+  }
   bool isIB() const;
   /// Adds noise digits, deleted the one using the itsmft::DigiParams interface
   void addNoise(UInt_t rofMin, UInt_t rofMax, const o2::itsmft::DigiParams* params, int maxRows = o2::itsmft::SegmentationAlpide::NRows, int maxCols = o2::itsmft::SegmentationAlpide::NCols) = delete;
