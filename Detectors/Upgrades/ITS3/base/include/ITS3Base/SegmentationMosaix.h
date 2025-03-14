@@ -168,25 +168,26 @@ class SegmentationMosaix
   /// center of the sensitive volume.
   /// If iRow and or iCol is outside of the segmentation range a value of -0.5*Dx()
   /// or -0.5*Dz() is returned.
-  constexpr bool detectorToLocal(int const iRow, int const iCol, float& xRow, float& zCol) const noexcept
-  {
-    if (!isValid(iRow, iCol)) {
+  template <typename T>
+  constexpr bool detectorToLocal(T const row, T const col, float& xRow, float& zCol) const noexcept {
+    if (!isValid(row, col)) {
       return false;
     }
-    detectorToLocalUnchecked(iRow, iCol, xRow, zCol);
+    detectorToLocalUnchecked(row, col, xRow, zCol);
     return isValid(xRow, zCol);
   }
 
   // Same as detectorToLocal w.o. checks.
   // We position ourself in the middle of the pixel.
-  constexpr void detectorToLocalUnchecked(int const iRow, int const iCol, float& xRow, float& zCol) const noexcept
-  {
-    xRow = -(static_cast<float>(iRow) + 0.5f) * PitchRow + WidthH;
-    zCol = (static_cast<float>(iCol) + 0.5f) * PitchCol - LengthH;
+  template <typename T>
+  constexpr void detectorToLocalUnchecked(T const row, T const col, float& xRow, float& zCol) const noexcept {
+    xRow = -(static_cast<float>(row) + 0.5f) * PitchRow + WidthH;
+    zCol = (static_cast<float>(col) + 0.5f) * PitchCol - LengthH;
   }
 
-  constexpr bool detectorToLocal(int const row, int const col, math_utils::Point3D<float>& loc) const noexcept
-  {
+
+  template <typename T>
+  constexpr bool detectorToLocal(T const row, T const col, math_utils::Point3D<float>& loc) const noexcept {
     float xRow{0.}, zCol{0.};
     if (!detectorToLocal(row, col, xRow, zCol)) {
       return false;
@@ -195,8 +196,8 @@ class SegmentationMosaix
     return true;
   }
 
-  constexpr void detectorToLocalUnchecked(int const row, int const col, math_utils::Point3D<float>& loc) const noexcept
-  {
+  template <typename T>
+  constexpr void detectorToLocalUnchecked(T const row, T const col, math_utils::Point3D<float>& loc) const noexcept {
     float xRow{0.}, zCol{0.};
     detectorToLocalUnchecked(row, col, xRow, zCol);
     loc.SetCoordinates(xRow, NominalYShift, zCol);
