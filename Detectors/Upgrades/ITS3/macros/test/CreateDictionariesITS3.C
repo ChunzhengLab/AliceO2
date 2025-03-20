@@ -52,7 +52,7 @@
 
 #endif
 
-void CreateDictionariesITS3(bool saveDeltas = false,
+void CreateDictionariesITS3(bool saveDeltas = true,
                             float probThreshold = 1e-6,
                             std::string clusDictFile = "",
                             std::string clusfile = "o2clus_its.root",
@@ -94,7 +94,7 @@ void CreateDictionariesITS3(bool saveDeltas = false,
   TNtuple* nt = nullptr;
   if (saveDeltas) {
     fout = TFile::Open("CreateDictionaries.root", "recreate");
-    nt = new TNtuple("nt", "hashes ntuple", "hash:layer:chipID:dx:dz:outlimDx:outlimDz");
+    nt = new TNtuple("nt", "hashes ntuple", "hash:layer:chipID:xhf:zhf:xcf:zcf:dx:dz:outlimDx:outlimDz");
   }
 
   const o2::steer::DigitizationContext* digContext = nullptr;
@@ -301,7 +301,7 @@ void CreateDictionariesITS3(bool saveDeltas = false,
                   }
                 }
                 if (saveDeltas) {
-                  nt->Fill(topology.getHash(), layer, chipID, dX, dZ, outLimitDx, outLimitDz);
+                  nt->Fill(topology.getHash(), layer, chipID, xyzLocM.X(), xyzLocM.Z(), locC.X(), locC.Z(), dX, dZ, outLimitDx, outLimitDz);
                 }
               }
             } else {

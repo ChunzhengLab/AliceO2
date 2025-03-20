@@ -43,24 +43,22 @@ class SegmentationMosaix
   // 3. The detector coordinate system. Defined by the row and column segmentation
   //    defined at the upper edge in the flat coord.
 
-  // row,col=0
-  // |
-  // v
-  // x----------------------x
+  // O----------------------|
   // |           |          |
+  // |           |          |  ^ x
+  // |           |          |  |
+  // |           |          |  |
+  // |           |          |  |
+  // |           |          |  X----> z   X marks (x,z)=(0,0)
+  // |-----------X----------|
+  // |           |          |  O----> col O marks (row,col)=(0,0)
+  // |           |          |  |
+  // |           |          |  |
+  // |           |          |  v
+  // |           |          |  row
   // |           |          |
-  // |           |          |                        ^ x
-  // |           |          |                        |
-  // |           |          |                        |
-  // |           |          |                        |
-  // |-----------X----------|  X marks (x,z)=(0,0)   X----> z
-  // |           |          |
-  // |           |          |
-  // |           |          |
-  // |           |          |
-  // |           |          |
-  // |           |          |
-  // x----------------------x
+  // |----------------------|
+
  public:
   constexpr SegmentationMosaix(int layer) : mRadius(static_cast<float>(constants::radiiMiddle[layer])) {}
   constexpr ~SegmentationMosaix() = default;
@@ -143,8 +141,11 @@ class SegmentationMosaix
   /// \param int iCol Detector z cell coordinate.
   constexpr bool localToDetector(float const xRow, float const zCol, int& iRow, int& iCol) const noexcept
   {
+    if (!isValidLoc(xRow, zCol)) {
+      return false;
+    }
     localToDetectorUnchecked(xRow, zCol, iRow, iCol);
-    if (!isValid(iRow, iCol)) {
+    if (!isValidDet(iRow, iCol)) {
       iRow = iCol = -1;
       return false;
     }
@@ -170,11 +171,11 @@ class SegmentationMosaix
   /// or -0.5*Dz() is returned.
   template <typename T>
   constexpr bool detectorToLocal(T const row, T const col, float& xRow, float& zCol) const noexcept {
-    if (!isValid(row, col)) {
+    if (!isValidDet(row, col)) {
       return false;
     }
     detectorToLocalUnchecked(row, col, xRow, zCol);
-    return isValid(xRow, zCol);
+    return isValidLoc(xRow, zCol);
   }
 
   // Same as detectorToLocal w.o. checks.
@@ -204,14 +205,19 @@ class SegmentationMosaix
   }
 
  private:
+  // Check local coordinates (cm) validity.
   template <typename T>
-  [[nodiscard]] constexpr bool isValid(T const row, T const col) const noexcept
+  constexpr bool isValidLoc(T const x, T const z) const noexcept
   {
-    if constexpr (std::is_floating_point_v<T>) { // compares in local coord.
-      return (-WidthH < row && row < WidthH && -LengthH < col && col < LengthH);
-    } else { // compares in rows/cols
-      return !static_cast<bool>(row < 0 || row >= static_cast<int>(NRows) || col < 0 || col >= static_cast<int>(NCols));
-    }
+    return (-WidthH < x && x < WidthH && -LengthH < z && z < LengthH);
+  }
+
+  // Check detector coordinates validity.
+  template <typename T>
+  constexpr bool isValidDet(T const row, T const col) const noexcept
+  {
+    return (row >= 0 && row < static_cast<T>(NRows) &&
+            col >= 0 && col < static_cast<T>(NCols));
   }
 
   float mRadius;
