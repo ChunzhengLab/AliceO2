@@ -78,7 +78,7 @@ void Digitizer::init()
     } else {
       LOGP(fatal, "ResponseFunction '{}' not implemented!", func);
     }
-    mSimRespIBShift = mSimRespIB->getDepthMax() - constants::silicon::thicknessOut;
+    mSimRespIBShift = mSimRespIB->getDepthMax() - constants::silicon::thickness / 2.f;
     mSimRespOBShift = mSimRespOB->getDepthMax() - SegmentationOB::SensorLayerThickness / 2.f;
   }
 
