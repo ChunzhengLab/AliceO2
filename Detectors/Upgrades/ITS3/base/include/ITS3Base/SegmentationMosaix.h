@@ -77,7 +77,7 @@ class SegmentationMosaix
   static constexpr float PitchCol{constants::pixelarray::pixels::mosaix::pitchZ};
   static constexpr float PitchRow{constants::pixelarray::pixels::mosaix::pitchX};
   static constexpr float SensorLayerThickness{constants::totalThickness};
-  static constexpr float NominalYShift{constants::nominalYShift};
+  static constexpr float NominalYShift{0.0f};
 
   /// Transformation from the curved surface to a flat surface.
   /// Additionally a shift in the flat coordinates must be applied because

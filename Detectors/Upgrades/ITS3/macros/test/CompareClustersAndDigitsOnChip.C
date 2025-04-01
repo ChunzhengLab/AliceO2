@@ -26,6 +26,9 @@
 #include <TTree.h>
 #include <filesystem>
 #include <fstream>
+#include <regex>
+#include <set>
+#include <map>
 #endif
 
 #define ENABLE_UPGRADES
@@ -76,7 +79,7 @@ struct Data {
 
 void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
                                     std::string digifile = "it3digits.root",
-                                    std::string dictfile = "IT3dictionary.root",
+                                    std::string dictfile = "",
                                     std::string hitfile = "o2sim_HitsIT3.root",
                                     std::string inputGeom = "o2sim_geometry.root",
                                     bool batch = true)
@@ -108,6 +111,90 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
                                                  o2::math_utils::TransformType::T2GRot,
                                                  o2::math_utils::TransformType::L2G)); // request cached transforms
   const int nChips = gman->getNumberOfChips();
+
+  LOGP(info, "Total number of chips is {} in ITS3 (IB and OB)", nChips);
+  
+  // Create all plots
+  LOGP(info, "Selecting chips to be visualised");
+  std::set<int> selectedChips;
+  std::map<std::string, std::vector<int>> chipGroups;
+  
+  for (int chipID{0}; chipID < nChips; ++chipID) {
+    TString tpath = gman->getMatrixPath(chipID);
+    std::string path = tpath.Data();
+ 
+    std::vector<std::string> tokens;
+    std::istringstream iss(path);
+    std::string token;
+    while (std::getline(iss, token, '/')) {
+      if (!token.empty()) {
+        tokens.push_back(token);
+      }
+    }
+ 
+    std::string segmentName, staveName, carbonFormName;
+    for (const auto& t : tokens) {
+      if (t.find("ITS3Segment") != std::string::npos) segmentName = t;
+      if (t.find("ITSUStave") != std::string::npos) staveName = t;
+      if (t.find("ITS3CarbonForm") != std::string::npos) carbonFormName = t;
+    }
+ 
+    std::string groupKey;
+    if (!segmentName.empty()) {
+      groupKey = segmentName + "_" + carbonFormName;
+    } else if (!staveName.empty()) {
+      groupKey = staveName;
+    } else {
+      continue;
+    }
+ 
+    chipGroups[groupKey].push_back(chipID);
+  }
+
+  LOGP(info, "From each IB Segment or OB Stave, 10 chipIDs are uniformly selected");
+  LOGP(info, "Selected chipID: ");
+  for (auto& [groupName, ids] : chipGroups) {
+    std::vector<int> sampled;
+    if (ids.size() <= 10) {
+      for (auto id : ids) {
+        selectedChips.insert(id);
+        sampled.push_back(id);
+      }
+    } else {
+      for (int i{0}; i < 10; ++i) {
+        int idx = i * (ids.size() - 1) / 9; // 9 intervals for 10 points
+        int id = ids[idx];
+        if (selectedChips.insert(id).second) {
+          sampled.push_back(id);
+        }
+      }
+    }
+
+    std::ostringstream oss;
+    std::string topOrBot = "N/A";
+    std::smatch match;
+    std::regex rgxSegment(R"(Segment(\d+)_(\d+)_ITS3CarbonForm\d+_(\d+))");
+    std::regex rgxStave(R"(Stave(\d+)_(\d+))");
+    if (std::regex_search(groupName, match, rgxSegment)) {
+      int layer = std::stoi(match[1]);
+      int segment = std::stoi(match[2]);
+      int carbonForm = std::stoi(match[3]);
+      topOrBot = (carbonForm == 0 ? "TOP" : "BOT");
+      oss << topOrBot << " segment " << segment << " at layer " << layer << ": ";
+    } else if (std::regex_search(groupName, match, rgxStave)) {
+      int layer = std::stoi(match[1]);
+      int stave = std::stoi(match[2]);
+      oss << "Stave " << stave << " at layer " << layer << ": ";
+    } else {
+      LOGP(error, "Cannot select the correct chipID in OB or IB");
+      return;
+    }
+    for (auto id : sampled) {
+      oss << id << " ";
+    }
+    LOG(info) << oss.str();
+  }
+  LOGP(info, "{} selected chips will be visualized and analyzed.", chipGroups.size());
 
   // Hits
   TFile fileH(hitfile.data());
@@ -198,12 +285,15 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
 
   // Create all plots
   LOGP(info, "Creating plots");
-  std::vector<Data> data(nChips);
-  for (int iChip{0}; iChip < nChips; ++iChip) {
-    auto& dat = data[iChip];
+  std::unordered_map<int, Data> data;
+  auto initData = [&](int chipID, Data& dat) {
+    if (dat.pixelArray) return;
+  
     int nCol{0}, nRow{0};
     float lengthPixArr{0}, widthPixArr{0};
-    if (o2::its3::constants::detID::isDetITS3(iChip)) {
+    bool isIB = o2::its3::constants::detID::isDetITS3(chipID);
+    int layer = gman->getLayer(chipID);
+    if (isIB) {
       nCol = o2::its3::SegmentationMosaix::NCols;
       nRow = o2::its3::SegmentationMosaix::NRows;
       lengthPixArr = o2::its3::constants::pixelarray::pixels::mosaix::pitchZ * nCol;
@@ -214,30 +304,25 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
       lengthPixArr = o2::itsmft::SegmentationAlpide::PitchCol * nCol;
       widthPixArr = o2::itsmft::SegmentationAlpide::PitchRow * nRow;
     }
-
-    dat.pixelArray = new TH2F(Form("histSensor_%d", iChip), Form("SensorID=%d;z(cm);x(cm)", iChip),
+  
+    dat.pixelArray = new TH2F(Form("histSensor_%d", chipID), Form("SensorID=%d;z(cm);x(cm)", chipID),
                               nCol, -0.5 * lengthPixArr, 0.5 * lengthPixArr,
                               nRow, -0.5 * widthPixArr, 0.5 * widthPixArr);
     dat.hitS = new TGraph();
     dat.hitS->SetMarkerStyle(kFullTriangleDown);
     dat.hitS->SetMarkerColor(kGreen);
-    dat.hitS->SetEditable(kFALSE);
     dat.hitM = new TGraph();
     dat.hitM->SetMarkerStyle(kFullCircle);
     dat.hitM->SetMarkerColor(kGreen + 3);
-    dat.hitM->SetEditable(kFALSE);
     dat.hitE = new TGraph();
     dat.hitE->SetMarkerStyle(kFullTriangleUp);
     dat.hitE->SetMarkerColor(kGreen + 5);
-    dat.hitE->SetEditable(kFALSE);
-    dat.clusS = new TGraph(1);
+    dat.clusS = new TGraph();
     dat.clusS->SetMarkerStyle(kFullSquare);
     dat.clusS->SetMarkerColor(kBlue);
-    dat.clusS->SetEditable(kFALSE);
-    dat.cog = new TGraph(1);
+    dat.cog = new TGraph();
     dat.cog->SetMarkerStyle(kFullDiamond);
     dat.cog->SetMarkerColor(kRed);
-    dat.cog->SetEditable(kFALSE);
     dat.leg = new TLegend(0.7, 0.7, 0.92, 0.92);
     dat.leg->AddEntry(dat.hitS, "Hit Start");
     dat.leg->AddEntry(dat.hitM, "Hit Middle");
@@ -245,13 +330,14 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
     dat.leg->AddEntry(dat.clusS, "Cluster Start");
     dat.leg->AddEntry(dat.cog, "Cluster COG");
     dat.vClusBox = new std::vector<TBox*>;
-  }
+  };
 
   LOGP(info, "Filling digits");
   for (int iDigit{0}; digTree->LoadTree(iDigit) >= 0; ++iDigit) {
     digTree->GetEntry(iDigit);
     for (const auto& digit : *digArr) {
       const auto chipID = digit.getChipIndex();
+      if (!selectedChips.count(chipID)) continue;
       const auto layer = gman->getLayer(chipID);
       bool isIB = layer < 3;
       float locDigiX{0}, locDigiZ{0};
@@ -260,6 +346,8 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
       } else {
         o2::itsmft::SegmentationAlpide::detectorToLocal(digit.getRow(), digit.getColumn(), locDigiX, locDigiZ);
       }
+      auto& dat = data[chipID];
+      initData(chipID, dat);
       data[chipID].pixelArray->Fill(locDigiZ, locDigiX);
     }
   }
@@ -267,7 +355,7 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
   LOGP(info, "Building min and max MC events used by each ROF, total ROFs {}", nROFRec);
   auto pattIt = patternsPtr->cbegin();
   bool isAllPattIDInvaild{true};
-  for (unsigned int irof = 0; irof < nROFRec; irof++) {
+  for (unsigned int irof{0}; irof < nROFRec; irof++) {
     const auto& rofRec = rofRecVec[irof];
     // >> read and map MC events contributing to this ROF
     for (int im = mcEvMin[irof]; im <= mcEvMax[irof]; im++) {
@@ -285,14 +373,39 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
     }
 
     // Clusters in this ROF
-    for (int icl = 0; icl < rofRec.getNEntries(); icl++) {
+    for (int icl{0}; icl < rofRec.getNEntries(); icl++) {
       int clEntry = rofRec.getFirstEntry() + icl; // entry of icl-th cluster of this ROF in the vector of clusters
       const auto& cluster = (*clusArr)[clEntry];
       const auto chipID = cluster.getSensorID();
+      if (!selectedChips.count(chipID)) {
+        // Even if not selected, advance pattIt if patternID is InvalidPatternID
+        if (cluster.getPatternID() == o2::itsmft::CompCluster::InvalidPatternID) {
+          o2::itsmft::ClusterPattern::skipPattern(pattIt);
+        }
+        continue;
+      }
       const auto pattID = cluster.getPatternID();
       const bool isIB = o2::its3::constants::detID::isDetITS3(chipID);
       const auto layer = gman->getLayer(chipID);
+      auto& dat = data[chipID];
+      initData(chipID, dat);
       o2::itsmft::ClusterPattern pattern;
+      // Pattern extraction
+      if (cluster.getPatternID() != o2::itsmft::CompCluster::InvalidPatternID) {
+        isAllPattIDInvaild = false;
+        if (!hasAvailableDict) {
+          LOGP(error, "Encountered pattern ID {}, which is not equal to the invalid pattern ID {}", cluster.getPatternID(), o2::itsmft::CompCluster::InvalidPatternID);
+          LOGP(error, "Clusters have already been generated with a dictionary which was not provided properly!");
+          return;
+        }
+        if (dict.isGroup(cluster.getPatternID(), isIB)) {
+          pattern.acquirePattern(pattIt);
+        } else {
+          pattern = dict.getPattern(cluster.getPatternID(), isIB);
+        }
+      } else {
+        pattern.acquirePattern(pattIt);
+      }
 
       // Hits
       const auto& lab = (clusLabArr->getLabels(clEntry))[0];
@@ -332,30 +445,17 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
       }
       data[chipID].clusS->AddPoint(locCluZ, locCluX);
 
-      // Pattern extraction
-      if (cluster.getPatternID() != o2::itsmft::CompCluster::InvalidPatternID) {
-        isAllPattIDInvaild = false;
-        if (!hasAvailableDict) {
-          LOGP(error, "Encountered pattern ID {}, which is not equal to the invalid pattern ID {}", cluster.getPatternID(), o2::itsmft::CompCluster::InvalidPatternID);
-          LOGP(error, "Clusters have already been generated with a dictionary which was not provided properly!");
-          return;
-        }
-        if (dict.isGroup(cluster.getPatternID(), isIB)) {
-          pattern.acquirePattern(pattIt);
-        } else {
-          pattern = dict.getPattern(cluster.getPatternID(), isIB);
-        }
-      } else {
-        pattern.acquirePattern(pattIt);
-      }
-
       // COG
       o2::math_utils::Point3D<float> locCOG;
       // Cluster COG using dictionary (if available)
       if (hasAvailableDict && (pattID != o2::itsmft::CompCluster::InvalidPatternID && !dict.isGroup(pattID, isIB))) {
         locCOG = dict.getClusterCoordinates(cluster);
       } else {
-        locCOG = o2::itsmft::TopologyDictionary::getClusterCoordinates(cluster, pattern, false);
+        if(isIB) {
+          locCOG = o2::its3::TopologyDictionary::getClusterCoordinates(cluster, pattern, false);
+        } else {
+          locCOG = o2::itsmft::TopologyDictionary::getClusterCoordinates(cluster, pattern, false);
+        }
       }
       if (isIB) {
         float flatX{0}, flatY{0};
@@ -402,15 +502,16 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
       return;
     }
   }
-
+  
   LOGP(info, "Writing to root file");
   double x1, y1, x2, y2;
   auto oFileOut = TFile::Open("CompareClustersAndDigitsOnChip.root", "RECREATE");
   oFileOut->cd();
-  for (int iChip = 0; iChip < 4000; ++iChip) {
-    auto& dat = data[iChip];
-    auto path = gman->getMatrixPath(iChip);
-    const std::string cpath{path.Data() + 39, path.Data() + path.Length()};
+  for (int chipID{0}; chipID < nChips ; chipID++) {
+    if (!selectedChips.count(chipID)) continue;
+    auto& dat = data[chipID];
+    TString tpath = gman->getMatrixPath(chipID);
+    const std::string cpath{tpath.Data() + 39, tpath.Data() + tpath.Length()};
     const std::filesystem::path p{cpath};
     std::string nestedDir = p.parent_path().string();
     TDirectory* currentDir = oFileOut;
@@ -431,12 +532,12 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
       currentDir->cd();
     }
     if (!currentDir) {
-      LOGP(error, "Failed to create nested directory for chip %d", iChip);
+      LOGP(error, "Failed to create nested directory for chip %d", chipID);
       continue;
     }
-
-    auto canv = new TCanvas(Form("%s_%d", p.filename().c_str(), iChip));
-    canv->SetTitle(Form("%s_%d", p.filename().c_str(), iChip));
+ 
+    auto canv = new TCanvas(Form("%s_%d", p.filename().c_str(), chipID));
+    canv->SetTitle(Form("%s_%d", p.filename().c_str(), chipID));
     canv->cd();
     gPad->SetGrid(1, 1);
     dat.pixelArray->Draw("colz");
@@ -445,7 +546,7 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
     dat.hitE->Draw("p;same");
     auto arr = new TArrow();
     arr->SetArrowSize(0.01);
-    for (int i = 0; i < dat.hitS->GetN(); ++i) {
+    for (int i{0}; i < dat.hitS->GetN(); ++i) {
       dat.hitS->GetPoint(i, x1, y1);
       dat.hitE->GetPoint(i, x2, y2);
       arr->DrawArrow(x1, y1, x2, y2);
@@ -458,15 +559,15 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
     }
     dat.leg->Draw();
     canv->SetEditable(false);
-
+ 
     currentDir->WriteTObject(canv, canv->GetName());
     dat.clear();
     delete canv;
     delete arr;
-    printf("\rWriting chip %05d", iChip);
+    printf("\rWriting chip %05d", chipID);
   }
   printf("\n");
   oFileOut->Write();
   oFileOut->Close();
-  LOGP(info, "Finished!");
+  LOGP(info, "Finished writing selected chip visualizations.");
 }
