@@ -22,5 +22,6 @@
 #pragma link C++ class o2::its3::Digitizer + ;
 #pragma link C++ class o2::its3::ITS3DPLDigitizerParam + ;
 #pragma link C++ class o2::its3::ChipDigitsContainer + ;
+#pragma link C++ class o2::its3::ChipSimResponse + ;
 
 #endif

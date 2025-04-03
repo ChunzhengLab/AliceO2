@@ -113,16 +113,16 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
   const int nChips = gman->getNumberOfChips();
 
   LOGP(info, "Total number of chips is {} in ITS3 (IB and OB)", nChips);
-  
+
   // Create all plots
   LOGP(info, "Selecting chips to be visualised");
   std::set<int> selectedChips;
   std::map<std::string, std::vector<int>> chipGroups;
-  
+
   for (int chipID{0}; chipID < nChips; ++chipID) {
     TString tpath = gman->getMatrixPath(chipID);
     std::string path = tpath.Data();
- 
+
     std::vector<std::string> tokens;
     std::istringstream iss(path);
     std::string token;
@@ -131,14 +131,17 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
         tokens.push_back(token);
       }
     }
- 
+
     std::string segmentName, staveName, carbonFormName;
     for (const auto& t : tokens) {
-      if (t.find("ITS3Segment") != std::string::npos) segmentName = t;
-      if (t.find("ITSUStave") != std::string::npos) staveName = t;
-      if (t.find("ITS3CarbonForm") != std::string::npos) carbonFormName = t;
+      if (t.find("ITS3Segment") != std::string::npos)
+        segmentName = t;
+      if (t.find("ITSUStave") != std::string::npos)
+        staveName = t;
+      if (t.find("ITS3CarbonForm") != std::string::npos)
+        carbonFormName = t;
     }
- 
+
     std::string groupKey;
     if (!segmentName.empty()) {
       groupKey = segmentName + "_" + carbonFormName;
@@ -147,7 +150,7 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
     } else {
       continue;
     }
- 
+
     chipGroups[groupKey].push_back(chipID);
   }
 
@@ -287,8 +290,9 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
   LOGP(info, "Creating plots");
   std::unordered_map<int, Data> data;
   auto initData = [&](int chipID, Data& dat) {
-    if (dat.pixelArray) return;
-  
+    if (dat.pixelArray)
+      return;
+
     int nCol{0}, nRow{0};
     float lengthPixArr{0}, widthPixArr{0};
     bool isIB = o2::its3::constants::detID::isDetITS3(chipID);
@@ -304,7 +308,7 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
       lengthPixArr = o2::itsmft::SegmentationAlpide::PitchCol * nCol;
       widthPixArr = o2::itsmft::SegmentationAlpide::PitchRow * nRow;
     }
-  
+
     dat.pixelArray = new TH2F(Form("histSensor_%d", chipID), Form("SensorID=%d;z(cm);x(cm)", chipID),
                               nCol, -0.5 * lengthPixArr, 0.5 * lengthPixArr,
                               nRow, -0.5 * widthPixArr, 0.5 * widthPixArr);
@@ -337,7 +341,8 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
     digTree->GetEntry(iDigit);
     for (const auto& digit : *digArr) {
       const auto chipID = digit.getChipIndex();
-      if (!selectedChips.count(chipID)) continue;
+      if (!selectedChips.count(chipID))
+        continue;
       const auto layer = gman->getLayer(chipID);
       bool isIB = layer < 3;
       float locDigiX{0}, locDigiZ{0};
@@ -451,7 +456,7 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
       if (hasAvailableDict && (pattID != o2::itsmft::CompCluster::InvalidPatternID && !dict.isGroup(pattID, isIB))) {
         locCOG = dict.getClusterCoordinates(cluster);
       } else {
-        if(isIB) {
+        if (isIB) {
           locCOG = o2::its3::TopologyDictionary::getClusterCoordinates(cluster, pattern, false);
         } else {
           locCOG = o2::itsmft::TopologyDictionary::getClusterCoordinates(cluster, pattern, false);
@@ -502,13 +507,14 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
       return;
     }
   }
-  
+
   LOGP(info, "Writing to root file");
   double x1, y1, x2, y2;
   auto oFileOut = TFile::Open("CompareClustersAndDigitsOnChip.root", "RECREATE");
   oFileOut->cd();
-  for (int chipID{0}; chipID < nChips ; chipID++) {
-    if (!selectedChips.count(chipID)) continue;
+  for (int chipID{0}; chipID < nChips; chipID++) {
+    if (!selectedChips.count(chipID))
+      continue;
     auto& dat = data[chipID];
     TString tpath = gman->getMatrixPath(chipID);
     const std::string cpath{tpath.Data() + 39, tpath.Data() + tpath.Length()};
@@ -535,7 +541,7 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
       LOGP(error, "Failed to create nested directory for chip %d", chipID);
       continue;
     }
- 
+
     auto canv = new TCanvas(Form("%s_%d", p.filename().c_str(), chipID));
     canv->SetTitle(Form("%s_%d", p.filename().c_str(), chipID));
     canv->cd();
@@ -559,7 +565,7 @@ void CompareClustersAndDigitsOnChip(std::string clusfile = "o2clus_its.root",
     }
     dat.leg->Draw();
     canv->SetEditable(false);
- 
+
     currentDir->WriteTObject(canv, canv->GetName());
     dat.clear();
     delete canv;

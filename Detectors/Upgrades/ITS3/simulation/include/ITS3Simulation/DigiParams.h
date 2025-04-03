@@ -13,6 +13,7 @@
 #define ITS3_DIGIPARAMS_H
 
 #include "ITSMFTSimulation/DigiParams.h"
+#include "ITS3Simulation/ChipSimResponse.h"
 
 namespace o2::its3
 {
@@ -48,7 +49,7 @@ class DigiParams final : public o2::itsmft::DigiParams
   void setOBSimResponse(const o2::itsmft::AlpideSimResponse* response) { mOBSimResponse = response; }
 
   const o2::itsmft::AlpideSimResponse* getIBSimResponse() const { return mIBSimResponse; }
-  void setIBSimResponse(const o2::itsmft::AlpideSimResponse* response) { mIBSimResponse = response; }
+  void setIBSimResponse(const o2::itsmft::AlpideSimResponse* response);
 
   bool hasResponseFunctions() const { return mIBSimResponse != nullptr && mOBSimResponse != nullptr; }
 
@@ -56,7 +57,7 @@ class DigiParams final : public o2::itsmft::DigiParams
 
  private:
   const o2::itsmft::AlpideSimResponse* mOBSimResponse = nullptr; //!< pointer to external response
-  const o2::itsmft::AlpideSimResponse* mIBSimResponse = nullptr; //!< pointer to external response
+  const o2::its3::ChipSimResponse* mIBSimResponse = nullptr;     //!< pointer to external response
 
   ClassDefNV(DigiParams, 1);
 };

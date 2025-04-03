@@ -27,6 +27,7 @@
 #include "ITS3Base/SegmentationMosaix.h"
 #include "ITS3Simulation/DigiParams.h"
 #include "ITS3Simulation/ChipDigitsContainer.h"
+#include "ITS3Simulation/ChipSimResponse.h"
 #include "DataFormatsITSMFT/Digit.h"
 #include "DataFormatsITSMFT/ROFRecord.h"
 #include "CommonDataFormat/InteractionRecord.h"
@@ -108,7 +109,7 @@ class Digitizer : public TObject
 
   static constexpr std::array<o2::its3::SegmentationMosaix, 3> mIBSegmentations{0, 1, 2};
 
-  o2::itsmft::AlpideSimResponse* mSimRespIB = nullptr; // simulated response for IB
+  o2::its3::ChipSimResponse* mSimRespIB = nullptr;     // simulated response for IB
   o2::itsmft::AlpideSimResponse* mSimRespOB = nullptr; // simulated response for OB
   bool mSimRespIBOrientation{false};                   // wether the orientation in the IB response function is flipped
   float mSimRespIBShift{0.f};                          // adjusting the Y-shift in the IB response function to match sensor local coord.

@@ -68,4 +68,19 @@ void DigiParams::print() const
   getSignalShape().print();
 }
 
+void DigiParams::setIBSimResponse(const o2::itsmft::AlpideSimResponse* response)
+{
+  // This method is compatible with ChipSimResponse and will automatically handle center computation.
+  auto chipResp = static_cast<const o2::its3::ChipSimResponse*>(response);
+  if (chipResp) {
+    mIBSimResponse = chipResp;
+    if (mIBSimResponse->getRespCentreDep() == 0.f) {
+      const_cast<o2::its3::ChipSimResponse*>(mIBSimResponse)->computeCentreFromData();
+    }
+  } else {
+    LOG(error) << "Provided response is not of type ChipSimResponse. Cannot proceed.";
+    return;
+  }
+}
+
 } // namespace o2::its3

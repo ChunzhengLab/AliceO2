@@ -57,7 +57,7 @@ void Digitizer::init()
       if (!fOB || fOB->IsZombie() || !fOB->IsOpen()) {
         LOGP(fatal, "Cannot open file {}", fileOB);
       }
-      mParams.setIBSimResponse(mSimRespIB = fIB->Get<o2::itsmft::AlpideSimResponse>(nameIB));
+      mParams.setIBSimResponse(mSimRespIB = fIB->Get<o2::its3::ChipSimResponse>(nameIB));
       mParams.setOBSimResponse(mSimRespOB = fOB->Get<o2::itsmft::AlpideSimResponse>(nameOB));
       fIB->Close();
       fOB->Close();
