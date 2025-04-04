@@ -170,7 +170,8 @@ class SegmentationMosaix
   /// If iRow and or iCol is outside of the segmentation range a value of -0.5*Dx()
   /// or -0.5*Dz() is returned.
   template <typename T>
-  constexpr bool detectorToLocal(T const row, T const col, float& xRow, float& zCol) const noexcept {
+  constexpr bool detectorToLocal(T const row, T const col, float& xRow, float& zCol) const noexcept
+  {
     if (!isValidDet(row, col)) {
       return false;
     }
@@ -181,14 +182,15 @@ class SegmentationMosaix
   // Same as detectorToLocal w.o. checks.
   // We position ourself in the middle of the pixel.
   template <typename T>
-  constexpr void detectorToLocalUnchecked(T const row, T const col, float& xRow, float& zCol) const noexcept {
+  constexpr void detectorToLocalUnchecked(T const row, T const col, float& xRow, float& zCol) const noexcept
+  {
     xRow = -(static_cast<float>(row) + 0.5f) * PitchRow + WidthH;
     zCol = (static_cast<float>(col) + 0.5f) * PitchCol - LengthH;
   }
 
-
   template <typename T>
-  constexpr bool detectorToLocal(T const row, T const col, math_utils::Point3D<float>& loc) const noexcept {
+  constexpr bool detectorToLocal(T const row, T const col, math_utils::Point3D<float>& loc) const noexcept
+  {
     float xRow{0.}, zCol{0.};
     if (!detectorToLocal(row, col, xRow, zCol)) {
       return false;
@@ -198,7 +200,8 @@ class SegmentationMosaix
   }
 
   template <typename T>
-  constexpr void detectorToLocalUnchecked(T const row, T const col, math_utils::Point3D<float>& loc) const noexcept {
+  constexpr void detectorToLocalUnchecked(T const row, T const col, math_utils::Point3D<float>& loc) const noexcept
+  {
     float xRow{0.}, zCol{0.};
     detectorToLocalUnchecked(row, col, xRow, zCol);
     loc.SetCoordinates(xRow, NominalYShift, zCol);

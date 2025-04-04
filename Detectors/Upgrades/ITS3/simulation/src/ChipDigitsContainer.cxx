@@ -17,7 +17,7 @@ namespace its3
 {
 
 ChipDigitsContainer::ChipDigitsContainer(UShort_t idx)
-  : o2::itsmft::ChipDigitsContainer(idx){}
+  : o2::itsmft::ChipDigitsContainer(idx) {}
 
 bool ChipDigitsContainer::isIB() const
 {

@@ -285,7 +285,7 @@ void CreateDictionariesITS3(bool saveDeltas = true,
                 dX /= (ib) ? o2::its3::SegmentationMosaix::PitchRow : o2::itsmft::SegmentationAlpide::PitchRow;
                 dZ /= (ib) ? o2::its3::SegmentationMosaix::PitchCol : o2::itsmft::SegmentationAlpide::PitchCol;
 
-                float outLimitDx{-1}, outLimitDz{-1}; 
+                float outLimitDx{-1}, outLimitDz{-1};
                 if (checkOutliers > 0.) {
                   outLimitDx = topology.getRowSpan() * checkOutliers;
                   outLimitDz = topology.getColumnSpan() * checkOutliers;
