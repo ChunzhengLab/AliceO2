@@ -19,7 +19,8 @@
 #include "ITS3Simulation/DigiParams.h"            // ITS3-specific DigiParams interface
 #include <TRandom.h>
 
-namespace o2::its3 {
+namespace o2::its3
+{
 
 class ChipDigitsContainer : public o2::itsmft::ChipDigitsContainer
 {

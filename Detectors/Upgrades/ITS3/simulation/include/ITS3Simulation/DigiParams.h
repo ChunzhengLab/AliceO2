@@ -57,7 +57,7 @@ class DigiParams final : public o2::itsmft::DigiParams
 
  private:
   const o2::itsmft::AlpideSimResponse* mOBSimResponse = nullptr; //!< pointer to external response
-  o2::its3::ChipSimResponse* mIBSimResponse = nullptr;     //!< pointer to external response
+  o2::its3::ChipSimResponse* mIBSimResponse = nullptr;           //!< pointer to external response
 
   ClassDef(DigiParams, 1);
 };

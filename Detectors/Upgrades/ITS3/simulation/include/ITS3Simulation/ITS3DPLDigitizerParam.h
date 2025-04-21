@@ -15,7 +15,8 @@
 #include "CommonUtils/ConfigurableParam.h"
 #include "CommonUtils/ConfigurableParamHelper.h"
 
-namespace o2::its3 {
+namespace o2::its3
+{
 
 struct ITS3DPLDigitizerParam : public o2::conf::ConfigurableParamHelper<ITS3DPLDigitizerParam> {
   float IBNoisePerPixel = 1.e-8; ///< MOSAIX Noise per channel
