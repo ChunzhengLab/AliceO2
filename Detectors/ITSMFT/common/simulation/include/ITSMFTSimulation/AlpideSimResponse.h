@@ -69,7 +69,7 @@ class AlpideRespSimMat
  private:
   std::array<float, MatSize> data;
 
-  ClassDefNV(AlpideRespSimMat, 1);
+  ClassDef(AlpideRespSimMat, 2);
 };
 
 /*
