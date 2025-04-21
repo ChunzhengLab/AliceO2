@@ -14,6 +14,7 @@
 
 #include "Framework/Logger.h"
 #include "ITS3Simulation/DigiParams.h"
+#include <cstdio>
 
 ClassImp(o2::its3::DigiParams);
 
@@ -50,36 +51,29 @@ void DigiParams::setIBChargeThreshold(int v, float frac2Account)
 void DigiParams::print() const
 {
   // print settings
-  LOGF(info, "ITS3 DigiParams settings:");
-  LOGF(info, "Continuous readout                : %s", isContinuous() ? "ON" : "OFF");
-  LOGF(info, "Readout Frame Length(ns)          : %f", getROFrameLength());
-  LOGF(info, "Strobe delay (ns)                 : %f", getStrobeDelay());
-  LOGF(info, "Strobe length (ns)                : %f", getStrobeLength());
-  LOGF(info, "IB Threshold (N electrons)        : %d", getIBChargeThreshold());
-  LOGF(info, "OB Threshold (N electrons)        : %d", getChargeThreshold());
-  LOGF(info, "Min N electrons to account for IB : %d", getIBMinChargeToAccount());
-  LOGF(info, "Min N electrons to account for OB : %d", getMinChargeToAccount());
-  LOGF(info, "Number of charge sharing steps of IB    : %d", getIBNSimSteps());
-  LOGF(info, "Number of charge sharing steps of OB    : %d", getNSimSteps());
-  LOGF(info, "ELoss to N electrons factor       : %e", getEnergyToNElectrons());
-  LOGF(info, "Noise level per pixel of IB       : %e", getIBNoisePerPixel());
-  LOGF(info, "Noise level per pixel of OB       : %e", getNoisePerPixel());
-  LOGF(info, "Charge time-response:\n");
+  printf("ITS3 DigiParams settings:\n");
+  printf("Continuous readout                   : %s\n", isContinuous() ? "ON" : "OFF");
+  printf("Readout Frame Length(ns)             : %f\n", getROFrameLength());
+  printf("Strobe delay (ns)                    : %f\n", getStrobeDelay());
+  printf("Strobe length (ns)                   : %f\n", getStrobeLength());
+  printf("IB Threshold (N electrons)           : %d\n", getIBChargeThreshold());
+  printf("OB Threshold (N electrons)           : %d\n", getChargeThreshold());
+  printf("Min N electrons to account for IB    : %d\n", getIBMinChargeToAccount());
+  printf("Min N electrons to account for OB    : %d\n", getMinChargeToAccount());
+  printf("Number of charge sharing steps of IB : %d\n", getIBNSimSteps());
+  printf("Number of charge sharing steps of OB : %d\n", getNSimSteps());
+  printf("ELoss to N electrons factor          : %e\n", getEnergyToNElectrons());
+  printf("Noise level per pixel of IB          : %e\n", getIBNoisePerPixel());
+  printf("Noise level per pixel of OB          : %e\n", getNoisePerPixel());
+  printf("Charge time-response:\n");
   getSignalShape().print();
 }
 
-void DigiParams::setIBSimResponse(const o2::itsmft::AlpideSimResponse* response)
+void DigiParams::setIBSimResponse(o2::its3::ChipSimResponse* response)
 {
-  // This method is compatible with ChipSimResponse and will automatically handle center computation.
-  auto chipResp = static_cast<const o2::its3::ChipSimResponse*>(response);
-  if (chipResp) {
-    mIBSimResponse = chipResp;
-    if (mIBSimResponse->getRespCentreDep() == 0.f) {
-      const_cast<o2::its3::ChipSimResponse*>(mIBSimResponse)->computeCentreFromData();
-    }
-  } else {
-    LOG(error) << "Provided response is not of type ChipSimResponse. Cannot proceed.";
-    return;
+  mIBSimResponse = response;
+  if (mIBSimResponse) {
+    mIBSimResponse->computeCentreFromData();
   }
 }
 

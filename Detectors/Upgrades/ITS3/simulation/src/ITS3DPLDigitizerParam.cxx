@@ -11,11 +11,4 @@
 
 #include "ITS3Simulation/ITS3DPLDigitizerParam.h"
 
-namespace o2
-{
-namespace its3
-{
-static auto& sDigitizerParamITS3 = o2::its3::ITS3DPLDigitizerParam::Instance();
-} // namespace its3
-} // namespace o2
 O2ParamImpl(o2::its3::ITS3DPLDigitizerParam)

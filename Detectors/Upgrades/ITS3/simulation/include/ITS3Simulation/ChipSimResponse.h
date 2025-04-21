@@ -32,7 +32,7 @@ class ChipSimResponse : public o2::itsmft::AlpideSimResponse
  private:
   float mRespCentreDep = 0.f;
 
-  ClassDefNV(ChipSimResponse, 1);
+  ClassDef(ChipSimResponse, 1);
 };
 
 } // namespace its3

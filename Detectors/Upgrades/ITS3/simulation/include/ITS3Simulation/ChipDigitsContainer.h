@@ -19,15 +19,9 @@
 #include "ITS3Simulation/DigiParams.h"            // ITS3-specific DigiParams interface
 #include <TRandom.h>
 
-namespace o2
-{
-namespace its3
+namespace o2::its3
 {
 
-// IB uses the Alpide segmentation,
-// OB uses the Mosaix segmentation.
-using SegmentationIB = SegmentationMosaix;
-using SegmentationOB = o2::itsmft::SegmentationAlpide;
 class ChipDigitsContainer : public o2::itsmft::ChipDigitsContainer
 {
  private:
@@ -37,6 +31,9 @@ class ChipDigitsContainer : public o2::itsmft::ChipDigitsContainer
 
  public:
   explicit ChipDigitsContainer(UShort_t idx = 0);
+
+  using SegmentationIB = SegmentationMosaix;
+  using SegmentationOB = o2::itsmft::SegmentationAlpide;
 
   /// Returns whether the chip is in the inner barrel (IB)
   void setChipIndex(UShort_t idx)
@@ -57,7 +54,6 @@ class ChipDigitsContainer : public o2::itsmft::ChipDigitsContainer
   ClassDefNV(ChipDigitsContainer, 1);
 };
 
-} // namespace its3
-} // namespace o2
+} // namespace o2::its3
 
 #endif // ALICEO2_ITS3_CHIPDIGITSCONTAINER_

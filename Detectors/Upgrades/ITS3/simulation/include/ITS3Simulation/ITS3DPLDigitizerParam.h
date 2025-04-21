@@ -15,9 +15,7 @@
 #include "CommonUtils/ConfigurableParam.h"
 #include "CommonUtils/ConfigurableParamHelper.h"
 
-namespace o2
-{
-namespace its3
+namespace o2::its3
 {
 
 struct ITS3DPLDigitizerParam : public o2::conf::ConfigurableParamHelper<ITS3DPLDigitizerParam> {
@@ -29,7 +27,6 @@ struct ITS3DPLDigitizerParam : public o2::conf::ConfigurableParamHelper<ITS3DPLD
   O2ParamDef(ITS3DPLDigitizerParam, "ITS3DPLDigitizerParam");
 };
 
-} // namespace its3
-} // namespace o2
+} // namespace o2::its3
 
 #endif

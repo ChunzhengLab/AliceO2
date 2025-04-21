@@ -48,8 +48,8 @@ class DigiParams final : public o2::itsmft::DigiParams
   const o2::itsmft::AlpideSimResponse* getOBSimResponse() const { return mOBSimResponse; }
   void setOBSimResponse(const o2::itsmft::AlpideSimResponse* response) { mOBSimResponse = response; }
 
-  const o2::itsmft::AlpideSimResponse* getIBSimResponse() const { return mIBSimResponse; }
-  void setIBSimResponse(const o2::itsmft::AlpideSimResponse* response);
+  o2::its3::ChipSimResponse* getIBSimResponse() const { return mIBSimResponse; }
+  void setIBSimResponse(o2::its3::ChipSimResponse* response);
 
   bool hasResponseFunctions() const { return mIBSimResponse != nullptr && mOBSimResponse != nullptr; }
 
@@ -57,9 +57,9 @@ class DigiParams final : public o2::itsmft::DigiParams
 
  private:
   const o2::itsmft::AlpideSimResponse* mOBSimResponse = nullptr; //!< pointer to external response
-  const o2::its3::ChipSimResponse* mIBSimResponse = nullptr;     //!< pointer to external response
+  o2::its3::ChipSimResponse* mIBSimResponse = nullptr;           //!< pointer to external response
 
-  ClassDefNV(DigiParams, 1);
+  ClassDef(DigiParams, 1);
 };
 
 } // namespace o2::its3

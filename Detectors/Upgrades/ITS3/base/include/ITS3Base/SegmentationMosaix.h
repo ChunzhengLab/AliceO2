@@ -17,8 +17,6 @@
 #ifndef ALICEO2_ITS3_SEGMENTATIONMOSAIX_H_
 #define ALICEO2_ITS3_SEGMENTATIONMOSAIX_H_
 
-#include <type_traits>
-
 #include "MathUtils/Cartesian.h"
 #include "ITS3Base/SpecsV2.h"
 
@@ -78,7 +76,6 @@ class SegmentationMosaix
   static constexpr float PitchCol{constants::pixelarray::pixels::mosaix::pitchZ};
   static constexpr float PitchRow{constants::pixelarray::pixels::mosaix::pitchX};
   static constexpr float SensorLayerThickness{constants::totalThickness};
-  static constexpr float NominalYShift{0.0f};
 
   /// Transformation from the curved surface to a flat surface.
   /// Additionally a shift in the flat coordinates must be applied because
@@ -104,7 +101,7 @@ class SegmentationMosaix
     // the y position is in the silicon volume however we need the chip volume (silicon+metalstack)
     // this is accounted by a y shift
     xFlat = WidthH - mRadius * phi;
-    yFlat = dist - mRadius + NominalYShift;
+    yFlat = dist - mRadius;
   }
 
   /// Transformation from the flat surface to a curved surface
@@ -121,7 +118,7 @@ class SegmentationMosaix
   {
     // MUST align the flat surface with the curved surface with the original pixel array is on and account for metal
     // stack
-    float dist = yFlat - NominalYShift + mRadius;
+    float dist = yFlat + mRadius;
     float phi = (WidthH - xFlat) / mRadius;
     // the y position is in the chip volume however we need the silicon volume
     // this is accounted by a -y shift
@@ -170,8 +167,7 @@ class SegmentationMosaix
   /// center of the sensitive volume.
   /// If iRow and or iCol is outside of the segmentation range a value of -0.5*Dx()
   /// or -0.5*Dz() is returned.
-  template <typename T>
-  constexpr bool detectorToLocal(T const row, T const col, float& xRow, float& zCol) const noexcept
+  bool detectorToLocal(float const row, float const col, float& xRow, float& zCol) const noexcept
   {
     if (!isValidDet(row, col)) {
       return false;
@@ -182,30 +178,27 @@ class SegmentationMosaix
 
   // Same as detectorToLocal w.o. checks.
   // We position ourself in the middle of the pixel.
-  template <typename T>
-  constexpr void detectorToLocalUnchecked(T const row, T const col, float& xRow, float& zCol) const noexcept
+  void detectorToLocalUnchecked(float const row, float const col, float& xRow, float& zCol) const noexcept
   {
-    xRow = -(static_cast<float>(row) + 0.5f) * PitchRow + WidthH;
-    zCol = (static_cast<float>(col) + 0.5f) * PitchCol - LengthH;
+    xRow = -(row + 0.5f) * PitchRow + WidthH;
+    zCol = (col + 0.5f) * PitchCol - LengthH;
   }
 
-  template <typename T>
-  constexpr bool detectorToLocal(T const row, T const col, math_utils::Point3D<float>& loc) const noexcept
+  bool detectorToLocal(float const row, float const col, math_utils::Point3D<float>& loc) const noexcept
   {
     float xRow{0.}, zCol{0.};
     if (!detectorToLocal(row, col, xRow, zCol)) {
       return false;
     }
-    loc.SetCoordinates(xRow, NominalYShift, zCol);
+    loc.SetCoordinates(xRow, 0.0f, zCol);
     return true;
   }
 
-  template <typename T>
-  constexpr void detectorToLocalUnchecked(T const row, T const col, math_utils::Point3D<float>& loc) const noexcept
+  void detectorToLocalUnchecked(float const row, float const col, math_utils::Point3D<float>& loc) const noexcept
   {
     float xRow{0.}, zCol{0.};
     detectorToLocalUnchecked(row, col, xRow, zCol);
-    loc.SetCoordinates(xRow, NominalYShift, zCol);
+    loc.SetCoordinates(xRow, 0.0f, zCol);
   }
 
  private:
