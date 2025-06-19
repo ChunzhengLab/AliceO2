@@ -85,7 +85,7 @@ std::vector<float> getCollectionSeediciencies(o2::its3::ChipSimResponse* resp,
   bool flipRow = false, flipCol = false;
   for (auto depth : depths) {
     auto rspmat = resp->getResponse(0.0, 0.0,
-                                    um2cm(depth) + resp->getDepthMin() + 1.e-9,
+                                    um2cm(depth) + 1.e-9,
                                     flipRow, flipCol);
     seed.push_back(rspmat ? rspmat->getValue(2, 2) : 0.f);
   }
@@ -99,7 +99,7 @@ std::vector<float> getShareValues(o2::its3::ChipSimResponse* resp,
   bool flipRow = false, flipCol = false;
   for (auto depth : depths) {
     auto rspmat = resp->getResponse(0.0, 0.0,
-                                    um2cm(depth) + resp->getDepthMin() + 1.e-9,
+                                    um2cm(depth) + 1.e-9,
                                     flipRow, flipCol);
     float s = 0;
     int npix = resp->getNPix();
@@ -121,7 +121,7 @@ std::vector<float> getEffValues(o2::its3::ChipSimResponse* resp,
   bool flipRow = false, flipCol = false;
   for (auto depth : depths) {
     auto rspmat = resp->getResponse(0.0, 0.0,
-                                    um2cm(depth) + resp->getDepthMin() + 1.e-9,
+                                    um2cm(depth) + 1.e-9,
                                     flipRow, flipCol);
     float s = 0;
     int npix = resp->getNPix();
@@ -140,9 +140,12 @@ void CheckChipResponseFile()
   LoadRespFunc();
   LOG(info) << "Response function loaded" << std::endl;
 
-  std::vector<float> vecDepth(50);
-  for (int i = 0; i < 50; ++i)
-    vecDepth[i] = i;
+  std::vector<float> vecDepth;
+  int numPoints = 100;
+  for (int i = 0; i < numPoints; ++i) {
+      float value = -50 + i * (100.0f / (numPoints - 1));
+      vecDepth.push_back(value);
+  }
 
   int colors[] = {kOrange + 7, kRed + 1, kAzure + 4};
   struct RespInfo {
@@ -156,7 +159,7 @@ void CheckChipResponseFile()
     {mAlpSimResp1, "ALPIDE Vbb=-3V", colors[2]}};
 
   TCanvas* c1 = new TCanvas("c1", "c1", 800, 600);
-  TH1* frame = c1->DrawFrame(-1, -0.049, 50, 1.049);
+  TH1* frame = c1->DrawFrame(-50, -0.049, 50, 1.049);
   frame->SetTitle(";Depth(um);Charge Collection Seed / Share / Eff");
   TLegend* leg = new TLegend(0.15, 0.5, 0.4, 0.85);
   leg->SetFillStyle(0);
